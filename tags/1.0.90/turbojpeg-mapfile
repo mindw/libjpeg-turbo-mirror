@@ -1,0 +1,14 @@
+{
+	global:
+		tjInitCompress;
+		tjCompress;
+		TJBUFSIZE;
+		tjInitDecompress;
+		tjDecompressHeader;
+		tjDecompressHeader2;
+		tjDecompress;
+		tjDestroy;
+		tjGetErrorStr;
+	local:
+		*;
+};
