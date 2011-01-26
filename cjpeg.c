@@ -2,8 +2,6 @@
  * cjpeg.c
  *
  * Copyright (C) 1991-1998, Thomas G. Lane.
- * Modified 2003-2008 by Guido Vollbeding.
- * Copyright (C) 2010, D. R. Commander.
  * This file is part of the Independent JPEG Group's software.
  * For conditions of distribution and use, see the accompanying README file.
  *
@@ -27,7 +25,6 @@
 
 #include "cdjpeg.h"		/* Common decls for cjpeg/djpeg applications */
 #include "jversion.h"		/* for version message */
-#include "config.h"
 
 #ifdef USE_CCOMMAND		/* command-line reader for Macintosh */
 #ifdef __MWERKS__
@@ -152,7 +149,7 @@ usage (void)
 #endif
 
   fprintf(stderr, "Switches (names may be abbreviated):\n");
-  fprintf(stderr, "  -quality N[,...]   Compression quality (0..100; 5-95 is useful range)\n");
+  fprintf(stderr, "  -quality N     Compression quality (0..100; 5-95 is useful range)\n");
   fprintf(stderr, "  -grayscale     Create monochrome JPEG file\n");
 #ifdef ENTROPY_OPT_SUPPORTED
   fprintf(stderr, "  -optimize      Optimize Huffman table (smaller file, but slow compression)\n");
@@ -212,16 +209,21 @@ parse_switches (j_compress_ptr cinfo, int argc, char **argv,
 {
   int argn;
   char * arg;
+  int quality;			/* -quality parameter */
+  int q_scale_factor;		/* scaling percentage for -qtables */
   boolean force_baseline;
   boolean simple_progressive;
-  char * qualityarg = NULL;	/* saves -quality parm if any */
   char * qtablefile = NULL;	/* saves -qtables filename if any */
   char * qslotsarg = NULL;	/* saves -qslots parm if any */
   char * samplearg = NULL;	/* saves -sample parm if any */
   char * scansarg = NULL;	/* saves -scans parm if any */
 
   /* Set up default JPEG parameters. */
-
+  /* Note that default -quality level need not, and does not,
+   * match the default scaling for an explicit -qtables argument.
+   */
+  quality = 75;			/* default -quality value */
+  q_scale_factor = 100;		/* default to no scaling for -qtables */
   force_baseline = FALSE;	/* by default, allow 16-bit quantizers */
   simple_progressive = FALSE;
   is_targa = FALSE;
@@ -275,10 +277,7 @@ parse_switches (j_compress_ptr cinfo, int argc, char **argv,
       static boolean printed_version = FALSE;
 
       if (! printed_version) {
-	fprintf(stderr, "%s version %s (build %s)\n",
-		PACKAGE_NAME, VERSION, BUILD);
-	fprintf(stderr, "%s\n\n", LJTCOPYRIGHT);
-	fprintf(stderr, "Based on Independent JPEG Group's libjpeg, version %s\n%s\n\n",
+	fprintf(stderr, "Independent JPEG Group's CJPEG, version %s\n%s\n",
 		JVERSION, JCOPYRIGHT);
 	printed_version = TRUE;
       }
@@ -329,10 +328,13 @@ parse_switches (j_compress_ptr cinfo, int argc, char **argv,
 #endif
 
     } else if (keymatch(arg, "quality", 1)) {
-      /* Quality ratings (quantization table scaling factors). */
+      /* Quality factor (quantization table scaling factor). */
       if (++argn >= argc)	/* advance to next argument */
 	usage();
-      qualityarg = argv[argn];
+      if (sscanf(argv[argn], "%d", &quality) != 1)
+	usage();
+      /* Change scale factor in case -qtables is present. */
+      q_scale_factor = jpeg_quality_scaling(quality);
 
     } else if (keymatch(arg, "qslots", 2)) {
       /* Quantization table slot numbers. */
@@ -380,7 +382,7 @@ parse_switches (j_compress_ptr cinfo, int argc, char **argv,
        * default sampling factors.
        */
 
-    } else if (keymatch(arg, "scans", 4)) {
+    } else if (keymatch(arg, "scans", 2)) {
       /* Set scan script. */
 #ifdef C_MULTISCAN_FILES_SUPPORTED
       if (++argn >= argc)	/* advance to next argument */
@@ -420,12 +422,11 @@ parse_switches (j_compress_ptr cinfo, int argc, char **argv,
 
     /* Set quantization tables for selected quality. */
     /* Some or all may be overridden if -qtables is present. */
-    if (qualityarg != NULL)	/* process -quality if it was present */
-      if (! set_quality_ratings(cinfo, qualityarg, force_baseline))
-	usage();
+    jpeg_set_quality(cinfo, quality, force_baseline);
 
     if (qtablefile != NULL)	/* process -qtables if it was present */
-      if (! read_quant_tables(cinfo, qtablefile, force_baseline))
+      if (! read_quant_tables(cinfo, qtablefile,
+			      q_scale_factor, force_baseline))
 	usage();
 
     if (qslotsarg != NULL)	/* process -qslots if it was present */

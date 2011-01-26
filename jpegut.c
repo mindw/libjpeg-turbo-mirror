@@ -1,6 +1,6 @@
 /* Copyright (C)2004 Landmark Graphics Corporation
  * Copyright (C)2005 Sun Microsystems, Inc.
- * Copyright (C)2009-2010 D. R. Commander
+ * Copyright (C)2009 D. R. Commander
  *
  * This library is free software and may be redistributed and/or modified under
  * the terms of the wxWindows Library License, Version 3.1 or (at your option)
@@ -18,19 +18,11 @@
 #include <string.h>
 #include "./rrtimer.h"
 #include "./turbojpeg.h"
-#ifndef _WIN32
- #define stricmp strcasecmp
-#endif
 
 #define _catch(f) {if((f)==-1) {printf("TJPEG: %s\n", tjGetErrorStr());  bailout();}}
 
 const char *_subnamel[NUMSUBOPT]={"4:4:4", "4:2:2", "4:2:0", "GRAY"};
 const char *_subnames[NUMSUBOPT]={"444", "422", "420", "GRAY"};
-const int _hsf[NUMSUBOPT]={1, 2, 2, 1};
-const int _vsf[NUMSUBOPT]={1, 1, 2, 1};
-
-enum {YUVENCODE=1, YUVDECODE};
-int yuv=0;
 
 int exitstatus=0;
 #define bailout() {exitstatus=-1;  goto finally;}
@@ -54,28 +46,6 @@ void initbuf(unsigned char *buf, int w, int h, int ps, int flags)
 		_i, j;
 	if(flags&TJ_ALPHAFIRST) {roffset++;  goffset++;  boffset++;}
 	memset(buf, 0, w*h*ps);
-	if(ps==1)
-	{
-		for(_i=0; _i<16; _i++)
-		{
-			if(flags&TJ_BOTTOMUP) i=h-_i-1;  else i=_i;
-			for(j=0; j<w; j++)
-			{
-				if(((_i/8)+(j/8))%2==0) buf[w*i+j]=255;
-				else buf[w*i+j]=76;
-			}
-		}
-		for(_i=16; _i<h; _i++)
-		{
-			if(flags&TJ_BOTTOMUP) i=h-_i-1;  else i=_i;
-			for(j=0; j<w; j++)
-			{
-				if(((_i/8)+(j/8))%2==0) buf[w*i+j]=0;
-				else buf[w*i+j]=226;
-			}
-		}
-		return;
-	}
 	for(_i=0; _i<16; _i++)
 	{
 		if(flags&TJ_BOTTOMUP) i=h-_i-1;  else i=_i;
@@ -123,7 +93,6 @@ int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp, int flags)
 	int roffset=(flags&TJ_BGR)?2:0, goffset=1, boffset=(flags&TJ_BGR)?0:2, i,
 		_i, j;
 	if(flags&TJ_ALPHAFIRST) {roffset++;  goffset++;  boffset++;}
-	if(ps==1) roffset=goffset=boffset=0;
 	if(subsamp==TJ_GRAYSCALE)
 	{
 		for(_i=0; _i<16; _i++)
@@ -205,126 +174,6 @@ int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp, int flags)
 	return 1;
 }
 
-#define checkval(v, cv) { \
-	if(v<cv-1 || v>cv+1) { \
-		printf("\nComp. %s at %d,%d should be %d, not %d\n", #v, i, j, cv, v); \
-		retval=0;  goto bailout; \
-	}}
-
-#define checkval0(v) { \
-	if(v>1) { \
-		printf("\nComp. %s at %d,%d should be 0, not %d\n", #v, i, j, v); \
-		retval=0;  goto bailout; \
-	}}
-
-#define checkval255(v) { \
-	if(v<254 && !(v==217 && i==0 && j==21)) { \
-		printf("\nComp. %s at %d,%d should be 255, not %d\n", #v, i, j, v); \
-		retval=0;  goto bailout; \
-	}}
-
-#define PAD(v, p) ((v+(p)-1)&(~((p)-1)))
-
-int checkbufyuv(unsigned char *buf, unsigned long size, int w, int h,
-	int subsamp)
-{
-	int i, j;
-	int hsf=_hsf[subsamp], vsf=_vsf[subsamp];
-	int pw=PAD(w, hsf), ph=PAD(h, vsf);
-	int cw=pw/hsf, ch=ph/vsf;
-	int ypitch=PAD(pw, 4), uvpitch=PAD(cw, 4);
-	int retval=1;
-	unsigned long correctsize=ypitch*ph + (subsamp==TJ_GRAYSCALE? 0:uvpitch*ch*2);
-
-	if(size!=correctsize)
-	{
-		printf("\nIncorrect size %lu.  Should be %lu\n", size, correctsize);
-		retval=0;  goto bailout;
-	}
-
-	for(i=0; i<16; i++)
-	{
-		for(j=0; j<pw; j++)
-		{
-			unsigned char y=buf[ypitch*i+j];
-			if(((i/8)+(j/8))%2==0) checkval255(y)
-			else checkval(y, 76)
-		}
-	}
-	for(i=16; i<ph; i++)
-	{
-		for(j=0; j<pw; j++)
-		{
-			unsigned char y=buf[ypitch*i+j];
-			if(((i/8)+(j/8))%2==0) checkval0(y)
-			else checkval(y, 226)
-		}
-	}
-	if(subsamp!=TJ_GRAYSCALE)
-	{
-		for(i=0; i<16/vsf; i++)
-		{
-			for(j=0; j<cw; j++)
-			{
-				unsigned char u=buf[ypitch*ph + (uvpitch*i+j)],
-					v=buf[ypitch*ph + uvpitch*ch + (uvpitch*i+j)];
-				if(((i*vsf/8)+(j*hsf/8))%2==0)
-				{
-					checkval(u, 128);  checkval(v, 128);
-				}
-				else
-				{
-					checkval(u, 85);  checkval255(v);
-				}
-			}
-		}
-		for(i=16/vsf; i<ch; i++)
-		{
-			for(j=0; j<cw; j++)
-			{
-				unsigned char u=buf[ypitch*ph + (uvpitch*i+j)],
-					v=buf[ypitch*ph + uvpitch*ch + (uvpitch*i+j)];
-				if(((i*vsf/8)+(j*hsf/8))%2==0)
-				{
-					checkval(u, 128);  checkval(v, 128);
-				}
-				else
-				{
-					checkval0(u);  checkval(v, 149);
-				}
-			}
-		}
-	}
-
-	bailout:
-	if(retval==0)
-	{
-		for(i=0; i<ph; i++)
-		{
-			for(j=0; j<pw; j++)
-				printf("%.3d ", buf[ypitch*i+j]);
-			printf("\n");
-		}
-		printf("\n");
-		for(i=0; i<ch; i++)
-		{
-			for(j=0; j<cw; j++)
-				printf("%.3d ", buf[ypitch*ph + (uvpitch*i+j)]);
-			printf("\n");
-		}
-		printf("\n");
-		for(i=0; i<ch; i++)
-		{
-			for(j=0; j<cw; j++)
-				printf("%.3d ", buf[ypitch*ph + uvpitch*ch + (uvpitch*i+j)]);
-			printf("\n");
-		}
-		printf("\n");
-	}
-
-	return retval;
-}
-
 void writejpeg(unsigned char *jpegbuf, unsigned long jpgbufsize, char *filename)
 {
 	FILE *outfile=NULL;
@@ -349,8 +198,6 @@ void gentestjpeg(tjhandle hnd, unsigned char *jpegbuf, unsigned long *size,
 	char tempstr[1024];  unsigned char *bmpbuf=NULL;
 	const char *pixformat;  double t;
 
-	if(yuv==YUVENCODE) flags|=TJ_YUV;
-
 	if(flags&TJ_BGR)
 	{
 		if(ps==3) pixformat="BGR";
@@ -361,13 +208,8 @@ void gentestjpeg(tjhandle hnd, unsigned char *jpegbuf, unsigned long *size,
 		if(ps==3) pixformat="RGB";
 		else {if(flags&TJ_ALPHAFIRST) pixformat="ARGB";  else pixformat="RGBA";}
 	}
-	if(ps==1) pixformat="Grayscale";
-	if(yuv==YUVENCODE)
-		printf("%s %s -> %s YUV ... ", pixformat,
-			(flags&TJ_BOTTOMUP)?"Bottom-Up":"Top-Down ", _subnamel[subsamp]);
-	else
-		printf("%s %s -> %s Q%d ... ", pixformat,
-			(flags&TJ_BOTTOMUP)?"Bottom-Up":"Top-Down ", _subnamel[subsamp], qual);
+	printf("%s %s -> %s Q%d ... ", pixformat,
+		(flags&TJ_BOTTOMUP)?"Bottom-Up":"Top-Down ", _subnamel[subsamp], qual);
 
 	if((bmpbuf=(unsigned char *)malloc(w*h*ps+1))==NULL)
 	{
@@ -380,38 +222,20 @@ void gentestjpeg(tjhandle hnd, unsigned char *jpegbuf, unsigned long *size,
 	_catch(tjCompress(hnd, bmpbuf, w, 0, h, ps, jpegbuf, size, subsamp, qual, flags));
 	t=rrtime()-t;
 
-	if(yuv==YUVENCODE)
-		sprintf(tempstr, "%s_enc_%s_%s_%s.yuv", basefilename, pixformat,
-			(flags&TJ_BOTTOMUP)? "BU":"TD", _subnames[subsamp]);
-	else
-		sprintf(tempstr, "%s_enc_%s_%s_%sQ%d.jpg", basefilename, pixformat,
-			(flags&TJ_BOTTOMUP)? "BU":"TD", _subnames[subsamp], qual);
+	sprintf(tempstr, "%s_enc_%s_%s_%sQ%d.jpg", basefilename, pixformat,
+		(flags&TJ_BOTTOMUP)? "BU":"TD", _subnames[subsamp], qual);
 	writejpeg(jpegbuf, *size, tempstr);
-	if(yuv==YUVENCODE)
-	{
-		if(checkbufyuv(jpegbuf, *size, w, h, subsamp)) printf("Passed.");
-		else printf("FAILED!");
-	}
-	else printf("Done.");
-	printf("  %f ms\n  Result in %s\n", t*1000., tempstr);
+	printf("Done.  %f ms\n  Result in %s\n", t*1000., tempstr);
 
 	finally:
 	if(bmpbuf) free(bmpbuf);
 }
 
 void gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
-	int w, int h, int ps, char *basefilename, int subsamp, int flags)
+	int w, int h, int ps, char *basefilename, int subsamp, int qual, int flags)
 {
 	unsigned char *bmpbuf=NULL;
 	const char *pixformat;  int _w=0, _h=0;  double t;
-	unsigned long size=0;
-	int hsf=_hsf[subsamp], vsf=_vsf[subsamp];
-	int pw=PAD(w, hsf), ph=PAD(h, vsf);
-	int cw=pw/hsf, ch=ph/vsf;
-	int ypitch=PAD(pw, 4), uvpitch=PAD(cw, 4);
-
-	if(yuv==YUVDECODE) flags|=TJ_YUV;
-	else if(yuv==YUVENCODE) return;
 
 	if(flags&TJ_BGR)
 	{
@@ -423,12 +247,7 @@ void gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
 		if(ps==3) pixformat="RGB";
 		else {if(flags&TJ_ALPHAFIRST) pixformat="ARGB";  else pixformat="RGBA";}
 	}
-	if(ps==1) pixformat="Grayscale";
-	if(yuv==YUVDECODE)
-		printf("JPEG -> YUV %s ... ", _subnames[subsamp]);
-	else
-		printf("JPEG -> %s %s ... ", pixformat,
-			(flags&TJ_BOTTOMUP)?"Bottom-Up":"Top-Down ");
+	printf("JPEG -> %s %s ... ", pixformat, (flags&TJ_BOTTOMUP)?"Bottom-Up":"Top-Down ");
 
 	_catch(tjDecompressHeader(hnd, jpegbuf, jpegsize, &_w, &_h));
 	if(_w!=w || _h!=h)
@@ -436,31 +255,19 @@ void gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
 		printf("Incorrect JPEG header\n");  bailout();
 	}
 
-	if(yuv==YUVDECODE)
-		size=ypitch*ph + (subsamp==TJ_GRAYSCALE? 0:uvpitch*ch*2);
-	else
-		size=w*h*ps;
-	if((bmpbuf=(unsigned char *)malloc(size+1))==NULL)
+	if((bmpbuf=(unsigned char *)malloc(w*h*ps+1))==NULL)
 	{
 		printf("ERROR: Could not allocate buffer\n");  bailout();
 	}
-	memset(bmpbuf, 0, size+1);
+	memset(bmpbuf, 0, w*ps*h);
 
 	t=rrtime();
 	_catch(tjDecompress(hnd, jpegbuf, jpegsize, bmpbuf, w, w*ps, h, ps, flags));
 	t=rrtime()-t;
 
-	if(yuv==YUVDECODE)
-	{
-		if(checkbufyuv(bmpbuf, size, pw, ph, subsamp))
-			printf("Passed.");
-		else printf("FAILED!");
-	}
-	else
-	{
-		if(checkbuf(bmpbuf, w, h, ps, subsamp, flags)) printf("Passed.");
-		else {printf("FAILED!");  dumpbuf(bmpbuf, w, h, ps, flags);}
-	}
+	if(checkbuf(bmpbuf, w, h, ps, subsamp, flags)) printf("Passed.");
+	else {printf("FAILED!");  dumpbuf(bmpbuf, w, h, ps, flags);}
+
 	printf("  %f ms\n\n", t*1000.);
 
 	finally:
@@ -483,32 +290,30 @@ void dotest(int w, int h, int ps, int subsamp, char *basefilename)
 		{printf("Error in tjInitDecompress():\n%s\n", tjGetErrorStr());  bailout();}
 
 	gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, 0);
-	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 0);
-
-	if(ps==1 || yuv==YUVDECODE) goto finally;
+	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, 0);
 
 	gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, TJ_BGR);
-	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, TJ_BGR);
+	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, TJ_BGR);
 
 	gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, TJ_BOTTOMUP);
-	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, TJ_BOTTOMUP);
+	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, TJ_BOTTOMUP);
 
 	gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, TJ_BGR|TJ_BOTTOMUP);
-	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, TJ_BGR|TJ_BOTTOMUP);
+	gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, TJ_BGR|TJ_BOTTOMUP);
 
 	if(ps==4)
 	{
 		gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST);
-		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, TJ_ALPHAFIRST);
+		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST);
 
 		gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST|TJ_BGR);
-		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, TJ_ALPHAFIRST|TJ_BGR);
+		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST|TJ_BGR);
 
 		gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST|TJ_BOTTOMUP);
-		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, TJ_ALPHAFIRST|TJ_BOTTOMUP);
+		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST|TJ_BOTTOMUP);
 
 		gentestjpeg(hnd, jpegbuf, &size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST|TJ_BGR|TJ_BOTTOMUP);
-		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, TJ_ALPHAFIRST|TJ_BGR|TJ_BOTTOMUP);
+		gentestbmp(dhnd, jpegbuf, size, w, h, ps, basefilename, subsamp, 100, TJ_ALPHAFIRST|TJ_BGR|TJ_BOTTOMUP);
 	}
 
 	finally:
@@ -572,30 +377,11 @@ void dotest1(void)
 
 int main(int argc, char *argv[])
 {
-	int doyuv=0;
-	if(argc>1 && !stricmp(argv[1], "-yuv")) doyuv=1;
-	if(doyuv) yuv=YUVENCODE;
-	dotest(35, 39, 3, TJ_444, "test");
-	dotest(39, 41, 4, TJ_444, "test");
-	if(doyuv)
-	{
-		dotest(41, 35, 3, TJ_422, "test");
-		dotest(35, 39, 4, TJ_422, "test");
-		dotest(39, 41, 3, TJ_420, "test");
-		dotest(41, 35, 4, TJ_420, "test");
-	}
-	dotest(35, 39, 1, TJ_GRAYSCALE, "test");
-	dotest(39, 41, 3, TJ_GRAYSCALE, "test");
-	dotest(41, 35, 4, TJ_GRAYSCALE, "test");
-	if(!doyuv) dotest1();
-	if(doyuv)
-	{
-		yuv=YUVDECODE;
-		dotest(48, 48, 3, TJ_444, "test");
-		dotest(35, 39, 3, TJ_444, "test");
-		dotest(48, 48, 1, TJ_GRAYSCALE, "test");
-		dotest(39, 41, 1, TJ_GRAYSCALE, "test");
-	}
+	dotest(35, 41, 3, TJ_444, "test");
+	dotest(35, 41, 4, TJ_444, "test");
+	dotest(35, 41, 3, TJ_GRAYSCALE, "test");
+	dotest(35, 41, 4, TJ_GRAYSCALE, "test");
+	dotest1();
 
 	return exitstatus;
 }

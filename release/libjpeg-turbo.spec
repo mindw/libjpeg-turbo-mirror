@@ -5,13 +5,13 @@
 %endif
 
 Summary: A SIMD-accelerated JPEG codec which provides both the libjpeg and TurboJPEG APIs
-Name: @PACKAGE_NAME@
-Version: @VERSION@
+Name: %{_name}
+Version: %{_version}
 Vendor: The libjpeg-turbo Project
 URL: http://libjpeg-turbo.virtualgl.org
 Group: System Environment/Libraries
 #-->Source0: http://prdownloads.sourceforge.net/libjpeg-turbo/libjpeg-turbo-%{version}.tar.gz
-Release: @BUILD@
+Release: %{_build}
 License: wxWindows Library License, v3.1
 BuildRoot: %{_blddir}/%{name}-buildroot-%{version}-%{release}
 Prereq: /sbin/ldconfig
@@ -39,7 +39,7 @@ TurboJPEG/IPP.  It is faster in some areas but slower in others.
 #-->%setup -q
 
 #-->%build
-#-->configure libdir=/opt/%{name}/%{__lib} mandir=/opt/%{name}/man JPEG_LIB_VERSION=@JPEG_LIB_VERSION@ SO_MAJOR_VERSION=@SO_MAJOR_VERSION@ SO_MINOR_VERSION=@SO_MINOR_VERSION@ --with-pic
+#-->configure libdir=/opt/%{name}/%{__lib} mandir=/opt/%{name}/man --with-pic
 #-->make DESTDIR=$RPM_BUILD_ROOT libdir=/opt/%{name}/%{__lib} mandir=/opt/%{name}/man
 
 %install
@@ -55,6 +55,10 @@ mkdir -p $RPM_BUILD_ROOT/usr/include
 mv $RPM_BUILD_ROOT/opt/%{name}/include/turbojpeg.h $RPM_BUILD_ROOT/usr/include
 ln -fs /usr/include/turbojpeg.h $RPM_BUILD_ROOT/opt/%{name}/include/
 ln -fs /usr/%{__lib}/libturbojpeg.a $RPM_BUILD_ROOT/opt/%{name}/%{__lib}/
+%ifarch x86_64
+%else
+ln -fs %{__lib} $RPM_BUILD_ROOT/opt/%{name}/lib32
+%endif
 
 %post -p /sbin/ldconfig
 
@@ -65,7 +69,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc %{_srcdir}/README-turbo.txt %{_srcdir}/README %{_srcdir}/libjpeg.txt %{_srcdir}/usage.txt %{_srcdir}/LICENSE.txt %{_srcdir}/LGPL.txt
+%doc %{_srcdir}/README-turbo.txt %{_srcdir}/README %{_srcdir}/libjpeg.doc %{_srcdir}/usage.doc %{_srcdir}/LICENSE.txt %{_srcdir}/LGPL.txt
 %dir /opt/%{name}
 %dir /opt/%{name}/bin
 /opt/%{name}/bin/cjpeg
@@ -78,8 +82,8 @@ rm -rf $RPM_BUILD_ROOT
 %else
 /opt/%{name}/lib32
 %endif
-/opt/%{name}/%{__lib}/libjpeg.so.@SO_MAJOR_VERSION@.0.@SO_MINOR_VERSION@
-/opt/%{name}/%{__lib}/libjpeg.so.@SO_MAJOR_VERSION@
+/opt/%{name}/%{__lib}/libjpeg.so.62.0.0
+/opt/%{name}/%{__lib}/libjpeg.so.62
 /opt/%{name}/%{__lib}/libjpeg.so
 /opt/%{name}/%{__lib}/libjpeg.a
 /opt/%{name}/%{__lib}/libturbojpeg.a

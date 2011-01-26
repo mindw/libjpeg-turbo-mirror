@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.56])
-AC_INIT([libjpeg-turbo], [1.0.90])
+AC_INIT([libjpeg-turbo], [1.0.1])
 BUILD=`date +%Y%m%d`
 
 AM_INIT_AUTOMAKE([-Wall foreign dist-bzip2])
@@ -27,6 +27,27 @@ AC_TRY_COMPILE([ typedef struct undefined_structure * undef_struct_ptr; ], ,
 AC_MSG_RESULT(yes),
 [AC_MSG_RESULT(no)
 AC_DEFINE([INCOMPLETE_TYPES_BROKEN],[1],[Compiler does not support pointers to undefined structures.])])
+
+AC_MSG_CHECKING([whether the linker supports version scripts])
+VERSION_SCRIPT=no
+LDVER=`$LD --help </dev/null 2>&1 | grep "\-\-version-script"`
+if test "$LDVER"; then
+  VERSION_SCRIPT=yes
+  VERSION_SCRIPT_FLAG=-Wl,--version-script,
+  AC_MSG_RESULT(yes)
+else
+  LDVER=`$LD --help </dev/null 2>&1 | grep "\-M"`
+  if test "$LDVER"; then
+    VERSION_SCRIPT=yes
+    VERSION_SCRIPT_FLAG=-Wl,-M,
+    AC_MSG_RESULT(yes)
+  else
+    AC_MSG_RESULT(no)
+  fi
+fi
+
+AM_CONDITIONAL(VERSION_SCRIPT, test "x$VERSION_SCRIPT" = "xyes")
+AC_SUBST(VERSION_SCRIPT_FLAG)
 
 if test "x${GCC}" = "xyes"; then
   if test "x${SAVED_CFLAGS}" = "x"; then
@@ -110,127 +131,6 @@ case "$host_os" in
 esac
 AM_CONDITIONAL([IS_WIN32], [test "x$is_win32" = "x1"])
 
-AC_MSG_CHECKING([libjpeg API version])
-AC_ARG_VAR(JPEG_LIB_VERSION, [libjpeg API version (62, 70, or 80)])
-if test "x$JPEG_LIB_VERSION" = "x"; then
-    AC_ARG_WITH([jpeg7],
-        AC_HELP_STRING([--with-jpeg7], [Emulate libjpeg v7 API/ABI (this makes libjpeg-turbo backward incompatible with libjpeg v6b.)]))
-    AC_ARG_WITH([jpeg8],
-        AC_HELP_STRING([--with-jpeg8], [Emulate libjpeg v8b API/ABI (this makes libjpeg-turbo backward incompatible with libjpeg v6b.)]))
-    if test "x${with_jpeg8}" = "xyes"; then
-        JPEG_LIB_VERSION=80
-    else
-        if test "x${with_jpeg7}" = "xyes"; then
-            JPEG_LIB_VERSION=70
-        else
-            JPEG_LIB_VERSION=62
-        fi
-    fi
-fi
-JPEG_LIB_VERSION_DECIMAL=`expr $JPEG_LIB_VERSION / 10`.`expr $JPEG_LIB_VERSION % 10`
-AC_SUBST(JPEG_LIB_VERSION_DECIMAL)
-AC_MSG_RESULT([$JPEG_LIB_VERSION_DECIMAL])
-AC_DEFINE_UNQUOTED(JPEG_LIB_VERSION, [$JPEG_LIB_VERSION], [libjpeg API version])
-
-AC_MSG_CHECKING([libjpeg shared library version])
-AC_ARG_VAR(SO_MAJOR_VERSION, [Major version of the libjpeg-turbo shared library (default is determined by the API version)])
-AC_ARG_VAR(SO_MINOR_VERSION, [Minor version of the libjpeg-turbo shared library (default is determined by the API version)])
-if test "x$SO_MAJOR_VERSION" = "x"; then
-    case "$JPEG_LIB_VERSION" in
-        62)  SO_MAJOR_VERSION=$JPEG_LIB_VERSION ;;
-        *)   SO_MAJOR_VERSION=`expr $JPEG_LIB_VERSION / 10` ;;
-    esac
-fi
-if test "x$SO_MINOR_VERSION" = "x"; then
-    case "$JPEG_LIB_VERSION" in
-        80)  SO_MINOR_VERSION=2 ;;
-        *)   SO_MINOR_VERSION=0 ;;
-    esac
-fi
-AC_MSG_RESULT([$SO_MAJOR_VERSION:$SO_MINOR_VERSION])
-AC_SUBST(SO_MAJOR_VERSION)
-AC_SUBST(SO_MINOR_VERSION)
-
-VERSION_SCRIPT=yes
-AC_ARG_ENABLE([ld-version-script],
-  AS_HELP_STRING([--disable-ld-version-script],
-    [Disable linker version script for libjpeg-turbo (default is to use linker version script if the linker supports it)]),
-    [VERSION_SCRIPT=$enableval], [])
-
-AC_MSG_CHECKING([whether the linker supports version scripts])
-SAVED_LDFLAGS="$LDFLAGS"
-LDFLAGS="$LDFLAGS -Wl,--version-script,conftest.map"
-cat > conftest.map <<EOF
-VERS_1 {
-  global: *;
-};
-EOF
-AC_LINK_IFELSE(AC_LANG_PROGRAM([], []),
-  [VERSION_SCRIPT_FLAG=-Wl,--version-script,; AC_MSG_RESULT([yes (GNU style)])], [])
-if test "x$VERSION_SCRIPT_FLAG" = "x"; then
-  LDFLAGS="$SAVED_LDFLAGS -Wl,-M,conftest.map"
-  AC_LINK_IFELSE(AC_LANG_PROGRAM([], []),
-    [VERSION_SCRIPT_FLAG=-Wl,-M,; AC_MSG_RESULT([yes (Sun style)])], [])
-fi
-if test "x$VERSION_SCRIPT_FLAG" = "x"; then
-  VERSION_SCRIPT=no
-  AC_MSG_RESULT(no)
-fi
-
-ANON_VERSION_SCRIPT=yes
-AC_MSG_CHECKING([whether the linker supports anonymous version scripts])
-LDFLAGS="$SAVED_LDFLAGS -Wl,--version-script,conftest.map"
-cat > conftest.map <<EOF
-{
-  global: main;
-  local: *;
-};
-EOF
-AC_LINK_IFELSE(AC_LANG_PROGRAM([], []),
-  [ANON_VERSION_SCRIPT_FLAG=-Wl,--version-script,; AC_MSG_RESULT([yes (GNU style)])], [])
-if test "x$ANON_VERSION_SCRIPT_FLAG" = "x"; then
-  LDFLAGS="$SAVED_LDFLAGS -Wl,-M,conftest.map"
-  AC_LINK_IFELSE(AC_LANG_PROGRAM([], []),
-    [ANON_VERSION_SCRIPT_FLAG=-Wl,-M,; AC_MSG_RESULT([yes (Sun style)])], [])
-fi
-if test "x$ANON_VERSION_SCRIPT_FLAG" = "x"; then
-  ANON_VERSION_SCRIPT=no
-  AC_MSG_RESULT(no)
-fi
-LDFLAGS="$SAVED_LDFLAGS"
-
-AC_MSG_CHECKING([whether to use version script when building libjpeg])
-AC_MSG_RESULT($VERSION_SCRIPT)
-
-AM_CONDITIONAL(VERSION_SCRIPT, test "x$VERSION_SCRIPT" = "xyes")
-AM_CONDITIONAL(ANON_VERSION_SCRIPT, test "x$ANON_VERSION_SCRIPT" = "xyes")
-AC_SUBST(VERSION_SCRIPT_FLAG)
-AC_SUBST(ANON_VERSION_SCRIPT_FLAG)
-
-AC_MSG_CHECKING([whether to include arithmetic encoding support])
-AC_ARG_WITH([arith-enc],
-    AC_HELP_STRING([--without-arith-enc], [Omit arithmetic encoding support]))
-if test "x$with_arith_enc" = "xno"; then
-    AC_MSG_RESULT(no)
-else
-    AC_DEFINE([C_ARITH_CODING_SUPPORTED], [1], [Support arithmetic encoding])
-    AC_MSG_RESULT(yes)
-fi
-AM_CONDITIONAL([WITH_ARITH_ENC], [test "x$with_arith_enc" != "xno"])
-
-AC_MSG_CHECKING([whether to include arithmetic decoding support])
-AC_ARG_WITH([arith-dec],
-    AC_HELP_STRING([--without-arith-dec], [Omit arithmetic decoding support]))
-if test "x$with_arith_dec" = "xno"; then
-    AC_MSG_RESULT(no)
-else
-    AC_DEFINE([D_ARITH_CODING_SUPPORTED], [1], [Support arithmetic decoding])
-    AC_MSG_RESULT(yes)
-fi
-AM_CONDITIONAL([WITH_ARITH_DEC], [test "x$with_arith_dec" != "xno"])
-
-AM_CONDITIONAL([WITH_ARITH], [test "x$with_arith_dec" != "xno" -o "x$with_arith_enc" != "xno"])
-
 # SIMD is optional
 AC_ARG_WITH([simd],
     AC_HELP_STRING([--without-simd],[Omit accelerated SIMD routines.]))
@@ -279,7 +179,6 @@ esac
 AC_SUBST(RPMARCH)
 AC_SUBST(DEBARCH)
 AC_SUBST(BUILD)
-AC_DEFINE_UNQUOTED([BUILD], "$BUILD", [Build number])
 
 # jconfig.h is the file we use, but we have another before that to
 # fool autoheader. the reason is that we include this header in our
@@ -287,9 +186,5 @@ AC_DEFINE_UNQUOTED([BUILD], "$BUILD", [Build number])
 # jconfig.h is a minimal version that allows this package to be built
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_HEADERS([jconfig.h])
-AC_CONFIG_FILES([libjpeg-turbo.spec:release/libjpeg-turbo.spec.in])
-AC_CONFIG_FILES([makemacpkg:release/makemacpkg.in])
-AC_CONFIG_FILES([makesunpkg:release/makesunpkg.in])
-AC_CONFIG_FILES([libjpeg.map])
 AC_CONFIG_FILES([Makefile simd/Makefile])
 AC_OUTPUT
