@@ -103,8 +103,7 @@ void initbuf(unsigned char *buf, int w, int h, int ps, int flags)
 	}
 }
 
-void dumpbuf(unsigned char *buf, int w, int h, int ps, int scalefactor,
-	int flags)
+void dumpbuf(unsigned char *buf, int w, int h, int ps, int flags)
 {
 	int roffset=(flags&TJ_BGR)?2:0, goffset=1, boffset=(flags&TJ_BGR)?0:2, i,
 		j;
@@ -120,17 +119,15 @@ void dumpbuf(unsigned char *buf, int w, int h, int ps, int scalefactor,
 	}
 }
 
-int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp,
-	int scalefactor, int flags)
+int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp, int flags)
 {
 	int roffset=(flags&TJ_BGR)?2:0, goffset=1, boffset=(flags&TJ_BGR)?0:2, i,
 		_i, j;
 	if(flags&TJ_ALPHAFIRST) {roffset++;  goffset++;  boffset++;}
 	if(ps==1) roffset=goffset=boffset=0;
-	int halfway=16/scalefactor, blocksize=8/scalefactor;
 	if(subsamp==TJ_GRAYSCALE)
 	{
-		for(_i=0; _i<halfway; _i++)
+		for(_i=0; _i<16; _i++)
 		{
 			if(flags&TJ_BOTTOMUP) i=h-_i-1;  else i=_i;
 			for(j=0; j<w; j++)
@@ -138,7 +135,7 @@ int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp,
 				unsigned char r=buf[(w*i+j)*ps+roffset],
 					g=buf[(w*i+j)*ps+goffset],
 					b=buf[(w*i+j)*ps+boffset];
-				if(((_i/blocksize)+(j/blocksize))%2==0)
+				if(((_i/8)+(j/8))%2==0)
 				{
 					if(r<253 || g<253 || b<253) return 0;
 				}
@@ -148,7 +145,7 @@ int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp,
 				}
 			}
 		}
-		for(_i=halfway; _i<h; _i++)
+		for(_i=16; _i<h; _i++)
 		{
 			if(flags&TJ_BOTTOMUP) i=h-_i-1;  else i=_i;
 			for(j=0; j<w; j++)
@@ -156,7 +153,7 @@ int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp,
 				unsigned char r=buf[(w*i+j)*ps+roffset],
 					g=buf[(w*i+j)*ps+goffset],
 					b=buf[(w*i+j)*ps+boffset];
-				if(((_i/blocksize)+(j/blocksize))%2==0)
+				if(((_i/8)+(j/8))%2==0)
 				{
 					if(r>2 || g>2 || b>2) return 0;
 				}
@@ -169,13 +166,13 @@ int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp,
 	}
 	else
 	{
-		for(_i=0; _i<halfway; _i++)
+		for(_i=0; _i<16; _i++)
 		{
 			if(flags&TJ_BOTTOMUP) i=h-_i-1;  else i=_i;
 			for(j=0; j<w; j++)
 			{
 				if(buf[(w*i+j)*ps+roffset]<253) return 0;
-				if(((_i/blocksize)+(j/blocksize))%2==0)
+				if(((_i/8)+(j/8))%2==0)
 				{
 					if(buf[(w*i+j)*ps+goffset]<253) return 0;
 					if(buf[(w*i+j)*ps+boffset]<253) return 0;
@@ -187,13 +184,13 @@ int checkbuf(unsigned char *buf, int w, int h, int ps, int subsamp,
 				}
 			}
 		}
-		for(_i=halfway; _i<h; _i++)
+		for(_i=16; _i<h; _i++)
 		{
 			if(flags&TJ_BOTTOMUP) i=h-_i-1;  else i=_i;
 			for(j=0; j<w; j++)
 			{
 				if(buf[(w*i+j)*ps+boffset]>2) return 0;
-				if(((_i/blocksize)+(j/blocksize))%2==0)
+				if(((_i/8)+(j/8))%2==0)
 				{
 					if(buf[(w*i+j)*ps+roffset]>2) return 0;
 					if(buf[(w*i+j)*ps+goffset]>2) return 0;
@@ -403,14 +400,11 @@ void gentestjpeg(tjhandle hnd, unsigned char *jpegbuf, unsigned long *size,
 	if(bmpbuf) free(bmpbuf);
 }
 
-void _gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
-	int w, int h, int ps, char *basefilename, int subsamp, int flags,
-	int scalefactor)
+void gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
+	int w, int h, int ps, char *basefilename, int subsamp, int flags)
 {
 	unsigned char *bmpbuf=NULL;
-	const char *pixformat;  int _hdrw=0, _hdrh=0, _hdrsubsamp=-1;  double t;
-	int scaledw=(w+scalefactor-1)/scalefactor, scaledh=(h+scalefactor-1)/scalefactor;
-	int temp1, temp2;
+	const char *pixformat;  int _w=0, _h=0;  double t;
 	unsigned long size=0;
 
 	if(yuv==YUVENCODE) return;
@@ -429,29 +423,17 @@ void _gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
 	if(yuv==YUVDECODE)
 		printf("JPEG -> YUV %s ... ", _subnames[subsamp]);
 	else
-	{
-		printf("JPEG -> %s %s ", pixformat,
+		printf("JPEG -> %s %s ... ", pixformat,
 			(flags&TJ_BOTTOMUP)?"Bottom-Up":"Top-Down ");
-		if(scalefactor) printf("1/%d ... ", scalefactor);
-		else printf("... ");
-	}
 
-	_catch(tjDecompressHeader2(hnd, jpegbuf, jpegsize, &_hdrw, &_hdrh,
-		&_hdrsubsamp));
-	if(_hdrw!=w || _hdrh!=h || _hdrsubsamp!=subsamp)
+	_catch(tjDecompressHeader(hnd, jpegbuf, jpegsize, &_w, &_h));
+	if(_w!=w || _h!=h)
 	{
 		printf("Incorrect JPEG header\n");  bailout();
 	}
 
-	temp1=scaledw;  temp2=scaledh;
-	_catch(tjGetScaledSize(w, h, &temp1, &temp2));
-	if(temp1!=scaledw || temp2!=scaledh)
-	{
-		printf("Scaled size mismatch\n");  bailout();
-	}
-
 	if(yuv==YUVDECODE) size=TJBUFSIZEYUV(w, h, subsamp);
-	else size=scaledw*scaledh*ps+1;
+	else size=w*h*ps+1;
 	if((bmpbuf=(unsigned char *)malloc(size))==NULL)
 	{
 		printf("ERROR: Could not allocate buffer\n");  bailout();
@@ -465,7 +447,7 @@ void _gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
 	}
 	else
 	{
-		_catch(tjDecompress(hnd, jpegbuf, jpegsize, bmpbuf, scaledw, 0, scaledh, ps,
+		_catch(tjDecompress(hnd, jpegbuf, jpegsize, bmpbuf, w, w*ps, h, ps,
 			flags));
 	}
 	t=rrtime()-t;
@@ -477,34 +459,17 @@ void _gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
 	}
 	else
 	{
-		if(checkbuf(bmpbuf, scaledw, scaledh, ps, subsamp, scalefactor, flags))
-			printf("Passed.");
+		if(checkbuf(bmpbuf, w, h, ps, subsamp, flags)) printf("Passed.");
 		else
 		{
 			printf("FAILED!");  exitstatus=-1;
-			dumpbuf(bmpbuf, scaledw, scaledh, ps, scalefactor, flags);
+			dumpbuf(bmpbuf, w, h, ps, flags);
 		}
 	}
-	printf("  %f ms\n", t*1000.);
+	printf("  %f ms\n\n", t*1000.);
 
 	finally:
 	if(bmpbuf) free(bmpbuf);
-}
-
-void gentestbmp(tjhandle hnd, unsigned char *jpegbuf, unsigned long jpegsize,
-	int w, int h, int ps, char *basefilename, int subsamp, int flags)
-{
-	int i;
-	if((subsamp==TJ_444 || subsamp==TJ_GRAYSCALE) && !yuv)
-	{
-		for(i=1; i<=8; i*=2)
-			_gentestbmp(hnd, jpegbuf, jpegsize, w, h, ps, basefilename, subsamp,
-				flags, i);
-	}
-	else
-		_gentestbmp(hnd, jpegbuf, jpegsize, w, h, ps, basefilename, subsamp,
-			flags, 1);
-	printf("\n");
 }
 
 void dotest(int w, int h, int ps, int subsamp, char *basefilename)

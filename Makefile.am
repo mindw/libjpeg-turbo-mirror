@@ -35,25 +35,11 @@ libjpeg_la_SOURCES += jdarith.c
 endif
 
 libturbojpeg_la_SOURCES = $(libjpeg_la_SOURCES) turbojpegl.c turbojpeg.h \
-	transupp.c transupp.h
-
-if WITH_JNI
-
-libturbojpeg_la_SOURCES += turbojpeg-jni.c
-libturbojpeg_la_CFLAGS = ${JAVA_CFLAGS}
-TJMAPFILE = turbojpeg-mapfile.jni
-
-else
-
-TJMAPFILE = turbojpeg-mapfile
-
-endif
-
-libturbojpeg_la_SOURCES += $(TJMAPFILE)
+	turbojpeg-mapfile
 
 if VERSION_SCRIPT
 
-libturbojpeg_la_LDFLAGS += $(VERSION_SCRIPT_FLAG)$(srcdir)/$(TJMAPFILE)
+libturbojpeg_la_LDFLAGS += $(VERSION_SCRIPT_FLAG)$(srcdir)/turbojpeg-mapfile
 libjpeg_la_LDFLAGS += $(VERSION_SCRIPT_FLAG)libjpeg.map
 
 endif
@@ -122,9 +108,9 @@ DOCS= README install.txt usage.txt wizard.txt example.c libjpeg.txt \
 TESTFILES= testorig.jpg testorig.ppm testimg.bmp testimgflt.jpg \
 	testimgfst.jpg testimgint.jpg testimgp.jpg testimgflt.ppm testimgfst.ppm \
 	testimgint.ppm testimgflt-nosimd.jpg testimgcrop.jpg testimgari.jpg \
-	testimgari.ppm testimgfst100.jpg testimggray.jpg
+	testimgari.ppm testimgfst100.jpg
 
-EXTRA_DIST = win release java $(DOCS) $(TESTFILES) CMakeLists.txt \
+EXTRA_DIST = win release $(DOCS) $(TESTFILES) CMakeLists.txt \
 	sharedlib/CMakeLists.txt cmakescripts libjpeg.map.in
 
 dist-hook:
@@ -146,8 +132,6 @@ if WITH_SIMD
 else
 	cmp $(srcdir)/testimgflt-nosimd.jpg testoutflt.jpg
 endif
-	./cjpeg -dct int -grayscale -outfile testoutgray.jpg $(srcdir)/testorig.ppm
-	cmp $(srcdir)/testimggray.jpg testoutgray.jpg
 	./djpeg -dct int -fast -ppm -outfile testoutint.ppm $(srcdir)/testorig.jpg
 	cmp $(srcdir)/testimgint.ppm testoutint.ppm
 	./djpeg -dct fast -ppm -outfile testoutfst.ppm $(srcdir)/testorig.jpg

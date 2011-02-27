@@ -56,55 +56,6 @@ enum {TJ_444=0, TJ_422, TJ_420, TJ_GRAYSCALE};
 #define TJ_YUV           512
   /* Nothing to see here.  Pay no attention to the man behind the curtain. */
 
-/* Transform operations for tjTransform() */
-#define NUMXFORMOPT 8
-
-enum {
-TJXFORM_NONE=0,     /* Do not transform the position of the image pixels */
-TJXFORM_HFLIP,      /* Flip (mirror) image horizontally.  This transform is
-                       imperfect if there are any partial MCU blocks on the
-                       right edge (see below for explanation.) */
-TJXFORM_VFLIP,      /* Flip (mirror) image vertically.  This transform is
-                       imperfect if there are any partial MCU blocks on the
-                       bottom edge. */
-TJXFORM_TRANSPOSE,  /* Transpose image (flip/mirror along upper left to lower
-                       right axis.)  This transform is always perfect. */
-TJXFORM_TRANSVERSE, /* Transpose image (flip/mirror along upper right to lower
-                       left axis.)  This transform is imperfect if there are
-                       any partial MCU blocks in the image. */
-TJXFORM_ROT90,      /* Rotate image clockwise by 90 degrees.  This transform
-                       is imperfect if there are any partial MCU blocks on the
-                       bottom edge. */
-TJXFORM_ROT180,     /* Rotate image 180 degrees.  This transform is imperfect
-                       if there are any partial MCU blocks in the image. */
-TJXFORM_ROT270      /* Rotate image counter-clockwise by 90 degrees.  This
-                       transform is imperfect if there are any partial MCU
-                       blocks on the right edge. */
-};
-
-/* Transform options (these can be OR'ed together) */
-#define TJXFORM_PERFECT  1
-  /* This will cause the tjTransform() function to return an error if the
-     transform is not perfect.  Lossless transforms operate on MCU blocks,
-     which are 8x8 pixels if no chrominance subsampling is used, or 16x8 for
-     4:2:2 or 16x16 for 4:2:0.  If the image's width or height is not evenly
-     divisible by the MCU size, then there will be partial MCU blocks on the
-     right and/or bottom edges.  It is not possible to move these partial MCU
-     blocks to the top or left of the image, so any transform that would
-     require that is "imperfect."  If this option is not specified, then any
-     partial MCU blocks that cannot be transformed will be left in place, which
-     will create odd-looking strips on the right or bottom edge of the image.
-     */
-#define TJXFORM_TRIM     2
-  /* This option will cause tjTransform() to discard any partial MCU blocks
-     that cannot be transformed. */
-#define TJXFORM_CROP     4
-  /* This option will enable lossless cropping.  See the description of
-     tjTransform() below for more information. */
-#define TJXFORM_GRAY     8
-  /* This option will discard the color data in the input image and produce
-     a grayscale output image. */
-
 typedef void* tjhandle;
 
 #define TJPAD(p) (((p)+3)&(~3))
@@ -141,7 +92,7 @@ DLLEXPORT tjhandle DLLCALL tjInitCompress(void);
      int jpegsubsamp, int jpegqual, int flags)
 
   [INPUT] j = instance handle previously returned from a call to
-     tjInitCompress() or tjInitTransform()
+     tjInitCompress()
   [INPUT] srcbuf = pointer to user-allocated image buffer containing RGB or
      grayscale pixels to be compressed
   [INPUT] width = width (in pixels) of the source image
@@ -226,7 +177,7 @@ DLLEXPORT unsigned long DLLCALL TJBUFSIZEYUV(int width, int height,
   (AKA "YUV420P") format.
 
   [INPUT] j = instance handle previously returned from a call to
-     tjInitCompress() or tjInitTransform()
+     tjInitCompress()
   [INPUT] srcbuf = pointer to user-allocated image buffer containing RGB or
      grayscale pixels to be encoded
   [INPUT] width = width (in pixels) of the source image
@@ -276,7 +227,7 @@ DLLEXPORT tjhandle DLLCALL tjInitDecompress(void);
      int *width, int *height, int *jpegsubsamp)
 
   [INPUT] j = instance handle previously returned from a call to
-     tjInitDecompress() or tjInitTransform()
+     tjInitDecompress()
   [INPUT] srcbuf = pointer to a user-allocated buffer containing a JPEG image
   [INPUT] size = size of the JPEG image buffer (in bytes)
   [OUTPUT] width = width (in pixels) of the JPEG image
@@ -299,62 +250,28 @@ DLLEXPORT int DLLCALL tjDecompressHeader(tjhandle j,
 
 
 /*
-  int tjGetScaledSize(int input_width, int input_height,
-     int *output_width, int *output_height)
-
-  [INPUT] input_width = width (in pixels) of the JPEG image
-  [INPUT] input_height = height (in pixels) of the JPEG image
-  [INPUT/OUTPUT] output_width, output_height = Before calling this function,
-     *output_width and *output_height should be set to the desired dimensions
-     of the output image.  Upon returning from this function, they will be set
-     to the dimensions of the largest scaled down image that TurboJPEG can
-     produce without exceeding the desired dimensions.  If either *output_width
-     or *output_height is set to 0, then the corresponding dimension will not
-     be considered when determining the scaled image size.
-
-  RETURNS: 0 on success, -1 if arguments are out of bounds
-*/
-DLLEXPORT int DLLCALL tjGetScaledSize(int input_width, int input_height,
-	int *output_width, int *output_height);
-
-
-/*
   int tjDecompress(tjhandle j,
      unsigned char *srcbuf, unsigned long size,
      unsigned char *dstbuf, int width, int pitch, int height, int pixelsize,
      int flags)
 
   [INPUT] j = instance handle previously returned from a call to
-     tjInitDecompress() or tjInitTransform()
+     tjInitDecompress()
   [INPUT] srcbuf = pointer to a user-allocated buffer containing the JPEG image
      to decompress
   [INPUT] size = size of the JPEG image buffer (in bytes)
   [INPUT] dstbuf = pointer to user-allocated image buffer which will receive
-     the bitmap image.  This buffer should normally be pitch*scaled_height
-     bytes in size, where scaled_height is determined by calling
-     tjGetScaledSize() with the height of the desired output image.  This
-     pointer may also be used to decompress into a specific region of a
-     larger buffer.
-  [INPUT] width = desired width (in pixels) of the destination image.  If this
-     is smaller than the width of the JPEG image being decompressed, then
-     TurboJPEG will use scaling in the JPEG decompressor to generate the
-     largest possible image that will fit within the desired width.  If width
-     is set to 0, then only the height will be considered when determining the
-     scaled image size.
-  [INPUT] pitch = bytes per line of the destination image.  Normally, this is
-     scaled_width*pixelsize if the bitmap image is unpadded, else
-     TJPAD(scaled_width*pixelsize) if each line of the bitmap is padded to the
-     nearest 32-bit boundary, such as is the case for Windows bitmaps.
-     (NOTE: scaled_width can be determined by calling tjGetScaledSize().)  You
-     can also be clever and use this parameter to skip lines, etc.  Setting
-     this parameter to 0 is the equivalent of setting it to
-     scaled_width*pixelsize.
-  [INPUT] height = desired height (in pixels) of the destination image.  If
-     this is smaller than the height of the JPEG image being decompressed, then
-     TurboJPEG will use scaling in the JPEG decompressor to generate the
-     largest possible image that will fit within the desired height.  If
-     height is set to 0, then only the width will be considered when
-     determining the scaled image size.
+     the bitmap image.  This buffer should normally be pitch*height
+     bytes in size, although this pointer may also be used to decompress into
+     a specific region of a larger buffer.
+  [INPUT] width = width (in pixels) of the destination image
+  [INPUT] pitch = bytes per line of the destination image (width*pixelsize if
+     the bitmap is unpadded, else TJPAD(width*pixelsize) if each line of the
+     bitmap is padded to the nearest 32-bit boundary, such as is the case for
+     Windows bitmaps.  You can also be clever and use this parameter to skip
+     lines, etc.  Setting this parameter to 0 is the equivalent of setting it
+     to width*pixelsize.
+  [INPUT] height = height (in pixels) of the destination image
   [INPUT] pixelsize = size (in bytes) of each pixel in the destination image
      RGBX/BGRX/XRGB/XBGR: 4, RGB/BGR: 3, Grayscale: 1
   [INPUT] flags = the bitwise OR of one or more of the flags described in the
@@ -381,7 +298,7 @@ DLLEXPORT int DLLCALL tjDecompress(tjhandle j,
   used), then an intermediate buffer copy will be performed within TurboJPEG.
 
   [INPUT] j = instance handle previously returned from a call to
-     tjInitDecompress() or tjInitTransform()
+     tjInitDecompress()
   [INPUT] srcbuf = pointer to a user-allocated buffer containing the JPEG image
      to decompress
   [INPUT] size = size of the JPEG image buffer (in bytes)
@@ -400,65 +317,12 @@ DLLEXPORT int DLLCALL tjDecompressToYUV(tjhandle j,
 
 
 /*
-  tjhandle tjInitTransform(void)
-
-  Creates a new JPEG transformer instance, allocates memory for the structures,
-  and returns a handle to the instance.  Most applications will only need to
-  call this once at the beginning of the program or once for each concurrent
-  thread.  Don't try to create a new instance every time you transform an
-  image, because this may cause performance to suffer in some TurboJPEG
-  implementations.
-
-  RETURNS: NULL on error
-*/
-DLLEXPORT tjhandle DLLCALL tjInitTransform(void);
-
-
-/*
-  int tjTransform(tjhandle j,
-     unsigned char *srcbuf, unsigned long srcsize,
-     unsigned char *dstbuf, unsigned long *dstsize, 
-     int x, int y, int w, int h, int op, int options, int flags)
-
-  [INPUT] j = instance handle previously returned from a call to
-     tjInitTransform()
-  [INPUT] srcbuf = pointer to a user-allocated buffer containing the JPEG image
-     to transform
-  [INPUT] srcsize = size of the source JPEG image buffer (in bytes)
-  [INPUT] dstbuf = pointer to user-allocated image buffer which will receive
-     the transformed JPEG image.  Use the TJBUFSIZE(width, height) function to
-     determine the appropriate size for this buffer based on the cropped width
-     and height.
-  [OUTPUT] dstsize = pointer to unsigned long which receives the size (in
-     bytes) of the transformed image
-  [INPUT] x, y, w, h = the left edge, top edge, width, and height of the
-     cropping region.  If (x, y) does not fall on an MCU boundary, then x and
-     y will be silently moved left and/or up to the nearest MCU boundary.  You
-     can call tjGetCroppedSize() to determine how (or if) x, y, w, and h will
-     be modified ahead of time, so you can allocate the output buffer
-     appropriately.
-  [INPUT] op = one of the transform operations described in the "Transform
-     operations" section above.
-  [INPUT] options = the bitwise OR of one or more of the transform options
-     described in the "Transform options" section above.
-  [INPUT] flags = the bitwise OR of one or more of the flags described in the
-     "Flags" section above.
-
-  RETURNS: 0 on success, -1 on error
-*/
-DLLEXPORT int DLLCALL tjTransform(tjhandle j,
-	unsigned char *srcbuf, unsigned long size,
-	unsigned char *dstbuf, unsigned long *dstsize,
-	int x, int y, int w, int h, int op, int options, int flags);
-
-
-/*
   int tjDestroy(tjhandle h)
 
   Frees structures associated with a compression or decompression instance
   
   [INPUT] h = instance handle (returned from a previous call to
-     tjInitCompress(), tjInitDecompress(), or tjInitTransform()
+     tjInitCompress() or tjInitDecompress()
 
   RETURNS: 0 on success, -1 on error
 */

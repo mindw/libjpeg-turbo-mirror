@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.56])
-AC_INIT([libjpeg-turbo], [1.1.90])
+AC_INIT([libjpeg-turbo], [1.1.0])
 BUILD=`date +%Y%m%d`
 
 AM_INIT_AUTOMAKE([-Wall foreign dist-bzip2])
@@ -203,48 +203,6 @@ fi
 AM_CONDITIONAL([WITH_ARITH_DEC], [test "x$with_arith_dec" != "xno"])
 
 AM_CONDITIONAL([WITH_ARITH], [test "x$with_arith_dec" != "xno" -o "x$with_arith_enc" != "xno"])
-
-AC_ARG_VAR(JAVA_CFLAGS, [Compiler flags needed to find jni.h (default: -I/System/Library/Frameworks/JavaVM.framework/Headers on OS X, '-I/usr/java/include -I/usr/java/include/solaris' on Solaris, and '-I/usr/java/default/include -I/usr/java/default/include/linux' on Linux)])
-
-AC_MSG_CHECKING([whether to include JNI wrapper in TurboJPEG/OSS])
-AC_ARG_WITH([jni],
-    AC_HELP_STRING([--with-jni],[Include JNI wrapper in the TurboJPEG/OSS library]))
-
-BUILDJNILIB=0
-RPM_CONFIG_ARGS=
-if test "x$with_jni" = "xyes"; then
-    AC_MSG_RESULT(yes)
-
-    case $host_os in
-      darwin*)
-        DEFAULT_JAVA_CFLAGS=-I/System/Library/Frameworks/JavaVM.framework/Headers
-        BUILDJNILIB=1
-        ;;
-      solaris*)
-        DEFAULT_JAVA_CFLAGS='-I/usr/java/include -I/usr/java/include/solaris'
-        ;;
-      linux*)
-        DEFAULT_JAVA_CFLAGS='-I/usr/java/default/include -I/usr/java/default/include/linux'
-        ;;
-    esac
-    if test "x$JAVA_CFLAGS" = "x"; then
-        JAVA_CFLAGS=$DEFAULT_JAVA_CFLAGS
-    fi
-
-    SAVE_CPPFLAGS=${CPPFLAGS}
-    CPPFLAGS="${CPPFLAGS} ${JAVA_CFLAGS}"
-    AC_CHECK_HEADERS([jni.h], [DUMMY=1],
-        [AC_MSG_ERROR([Could not find JNI header file])])
-    CPPFLAGS=${SAVE_CPPFLAGS}
-    AC_SUBST(JAVA_CFLAGS)
-
-    RPM_CONFIG_ARGS=--with-jni
-else
-    AC_MSG_RESULT(no)
-fi
-AM_CONDITIONAL([WITH_JNI], [test "x$with_jni" = "xyes"])
-AC_SUBST(BUILDJNILIB)
-AC_SUBST(RPM_CONFIG_ARGS)
 
 # SIMD is optional
 AC_ARG_WITH([simd],

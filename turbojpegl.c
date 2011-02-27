@@ -23,7 +23,6 @@
 #include <jerror.h>
 #include <setjmp.h>
 #include "./turbojpeg.h"
-#include "transupp.h"
 
 #ifndef min
  #define min(a,b) ((a)<(b)?(a):(b))
@@ -70,10 +69,6 @@ typedef struct _jpgstruct
 static const int hsampfactor[NUMSUBOPT]={1, 2, 2, 1};
 static const int vsampfactor[NUMSUBOPT]={1, 1, 2, 1};
 static const int pixelsize[NUMSUBOPT]={3, 3, 3, 1};
-static const JXFORM_CODE xformtypes[NUMXFORMOPT]={
-	JXFORM_NONE, JXFORM_FLIP_H, JXFORM_FLIP_V, JXFORM_TRANSPOSE,
-	JXFORM_TRANSVERSE, JXFORM_ROT_90, JXFORM_ROT_180, JXFORM_ROT_270
-};
 
 #define _throw(c) {sprintf(lasterror, "%s", c);  retval=-1;  goto bailout;}
 #define checkhandle(h) jpgstruct *j=(jpgstruct *)h; \
@@ -92,8 +87,12 @@ static void destination_noop(struct jpeg_compress_struct *cinfo)
 {
 }
 
-static tjhandle _tjInitCompress(jpgstruct *j)
+DLLEXPORT tjhandle DLLCALL tjInitCompress(void)
 {
+	jpgstruct *j=NULL;
+	if((j=(jpgstruct *)malloc(sizeof(jpgstruct)))==NULL)
+		{sprintf(lasterror, "Memory allocation failure");  return NULL;}
+	memset(j, 0, sizeof(jpgstruct));
 	j->cinfo.err=jpeg_std_error(&j->jerr.pub);
 	j->jerr.pub.error_exit=my_error_exit;
 	j->jerr.pub.output_message=my_output_message;
@@ -111,15 +110,6 @@ static tjhandle _tjInitCompress(jpgstruct *j)
 
 	j->initc=1;
 	return (tjhandle)j;
-}
-
-DLLEXPORT tjhandle DLLCALL tjInitCompress(void)
-{
-	jpgstruct *j=NULL;
-	if((j=(jpgstruct *)malloc(sizeof(jpgstruct)))==NULL)
-		{sprintf(lasterror, "Memory allocation failure");  return NULL;}
-	memset(j, 0, sizeof(jpgstruct));
-	return _tjInitCompress(j);
 }
 
 
@@ -374,8 +364,12 @@ static void source_noop (struct jpeg_decompress_struct *dinfo)
 {
 }
 
-static tjhandle _tjInitDecompress(jpgstruct *j)
+DLLEXPORT tjhandle DLLCALL tjInitDecompress(void)
 {
+	jpgstruct *j;
+	if((j=(jpgstruct *)malloc(sizeof(jpgstruct)))==NULL)
+		{sprintf(lasterror, "Memory allocation failure");  return NULL;}
+	memset(j, 0, sizeof(jpgstruct));
 	j->dinfo.err=jpeg_std_error(&j->jerr.pub);
 	j->jerr.pub.error_exit=my_error_exit;
 	j->jerr.pub.output_message=my_output_message;
@@ -395,15 +389,6 @@ static tjhandle _tjInitDecompress(jpgstruct *j)
 
 	j->initd=1;
 	return (tjhandle)j;
-}
-
-DLLEXPORT tjhandle DLLCALL tjInitDecompress(void)
-{
-	jpgstruct *j;
-	if((j=(jpgstruct *)malloc(sizeof(jpgstruct)))==NULL)
-		{sprintf(lasterror, "Memory allocation failure");  return NULL;}
-	memset(j, 0, sizeof(jpgstruct));
-	return _tjInitDecompress(j);
 }
 
 
@@ -472,34 +457,6 @@ DLLEXPORT int DLLCALL tjDecompressHeader(tjhandle h,
 }
 
 
-DLLEXPORT int DLLCALL tjGetScaledSize(int input_width, int input_height,
-	int *output_width, int *output_height)
-{
-	int i, retval=0, scaledw=0, scaledh=0;
-
-	if(input_width<1 || input_height<1 || output_width==NULL
-		|| output_height==NULL || *output_width<0 || *output_height<0)
-		_throw("Invalid argument in tjGetScaledSize()");
-
-	if(*output_width==0) *output_width=input_width;
-	if(*output_height==0) *output_height=input_height;
-	if(*output_width<input_width || *output_height<input_height)
-	{
-		for(i=1; i<=8; i*=2)
-		{
-			scaledw=(input_width+i-1)/i;
-			scaledh=(input_height+i-1)/i;
-			if(scaledw<=*output_width && scaledh<=*output_height)
-				break;
-		}
-		*output_width=scaledw;  *output_height=scaledh;
-	}
-
-	bailout:
-	return retval;
-}
-
-
 DLLEXPORT int DLLCALL tjDecompress(tjhandle h,
 	unsigned char *srcbuf, unsigned long size,
 	unsigned char *dstbuf, int width, int pitch, int height, int ps,
@@ -509,7 +466,6 @@ DLLEXPORT int DLLCALL tjDecompress(tjhandle h,
 	int cw[MAX_COMPONENTS], ch[MAX_COMPONENTS], iw[MAX_COMPONENTS],
 		tmpbufsize=0, usetmpbuf=0, th[MAX_COMPONENTS];
 	JSAMPLE *_tmpbuf=NULL;  JSAMPROW *tmpbuf[MAX_COMPONENTS];
-	int scale_num=1, scale_denom=1, jpegwidth, jpegheight, scaledw, scaledh;
 
 	checkhandle(h);
 
@@ -519,11 +475,13 @@ DLLEXPORT int DLLCALL tjDecompress(tjhandle h,
 	}
 
 	if(srcbuf==NULL || size<=0
-		|| dstbuf==NULL || width<0 || pitch<0 || height<0)
+		|| dstbuf==NULL || width<=0 || pitch<0 || height<=0)
 		_throw("Invalid argument in tjDecompress()");
 	if(ps!=3 && ps!=4 && ps!=1)
 		_throw("This decompressor can only handle 24-bit and 32-bit RGB or 8-bit grayscale output");
 	if(!j->initd) _throw("Instance has not been initialized for decompression");
+
+	if(pitch==0) pitch=width*ps;
 
 	if(flags&TJ_FORCEMMX) putenv("JSIMD_FORCEMMX=1");
 	else if(flags&TJ_FORCESSE) putenv("JSIMD_FORCESSE=1");
@@ -583,6 +541,16 @@ DLLEXPORT int DLLCALL tjDecompress(tjhandle h,
 			}
 		}
 	}
+	else
+	{
+		if((row_pointer=(JSAMPROW *)malloc(sizeof(JSAMPROW)*height))==NULL)
+			_throw("Memory allocation failed in tjDecompress()");
+		for(i=0; i<height; i++)
+		{
+			if(flags&TJ_BOTTOMUP) row_pointer[i]= &dstbuf[(height-i-1)*pitch];
+			else row_pointer[i]= &dstbuf[i*pitch];
+		}
+	}
 
 	if(ps==1) j->dinfo.out_color_space = JCS_GRAYSCALE;
 	#if JCS_EXTENSIONS==1
@@ -603,28 +571,6 @@ DLLEXPORT int DLLCALL tjDecompress(tjhandle h,
 
 	if(flags&TJ_FASTUPSAMPLE) j->dinfo.do_fancy_upsampling=FALSE;
 	if(flags&TJ_YUV) j->dinfo.raw_data_out=TRUE;
-	else
-	{
-		jpegwidth=j->dinfo.image_width;  jpegheight=j->dinfo.image_height;
-		if(width==0) width=jpegwidth;
-		if(height==0) height=jpegheight;
-		if(width<jpegwidth || height<jpegheight)
-		{
-			for(i=1; i<=8; i*=2)
-			{
-				scaledw=(jpegwidth+i-1)/i;
-				scaledh=(jpegheight+i-1)/i;
-				if(scaledw<=width && scaledh<=height)
-					break;
-			}
-			if(scaledw>width || scaledh>height)
-				_throw("Could not scale down to desired image dimensions");
-			width=scaledw;  height=scaledh;
-			scale_denom=i;
-		}
-		j->dinfo.scale_num=scale_num;
-		j->dinfo.scale_denom=scale_denom;
-	}
 
 	jpeg_start_decompress(&j->dinfo);
 	if(flags&TJ_YUV)
@@ -658,16 +604,6 @@ DLLEXPORT int DLLCALL tjDecompress(tjhandle h,
 	}
 	else
 	{
-		if(pitch==0) pitch=j->dinfo.output_width*ps;
-		if((row_pointer=(JSAMPROW *)malloc(sizeof(JSAMPROW)
-			*j->dinfo.output_height))==NULL)
-			_throw("Memory allocation failed in tjInitDecompress()");
-		for(i=0; i<j->dinfo.output_height; i++)
-		{
-			if(flags&TJ_BOTTOMUP)
-				row_pointer[i]= &dstbuf[(j->dinfo.output_height-i-1)*pitch];
-			else row_pointer[i]= &dstbuf[i*pitch];
-		}
 		while(j->dinfo.output_scanline<j->dinfo.output_height)
 		{
 			jpeg_read_scanlines(&j->dinfo, &row_pointer[j->dinfo.output_scanline],
@@ -694,120 +630,6 @@ DLLEXPORT int DLLCALL tjDecompressToYUV(tjhandle h,
 	unsigned char *dstbuf, int flags)
 {
 	return tjDecompress(h, srcbuf, size, dstbuf, 1, 0, 1, 3, flags|TJ_YUV);
-}
-
-
-// Transformation
-
-DLLEXPORT tjhandle DLLCALL tjInitTransform(void)
-{
-	jpgstruct *j=NULL;  tjhandle tj=NULL;
-	if((j=(jpgstruct *)malloc(sizeof(jpgstruct)))==NULL)
-		{sprintf(lasterror, "Memory allocation failure");  return NULL;}
-	memset(j, 0, sizeof(jpgstruct));
-	tj=_tjInitCompress(j);
-	if(!tj) return NULL;
-	tj=_tjInitDecompress(j);
-	return tj;
-}
-
-
-DLLEXPORT int DLLCALL tjTransform(tjhandle hnd,
-	unsigned char *srcbuf, unsigned long srcsize,
-	unsigned char *dstbuf, unsigned long *dstsize,
-	int x, int y, int w, int h, int op, int options, int flags)
-{
-	jpeg_transform_info xinfo;
-	jvirt_barray_ptr *srccoefs, *dstcoefs;
-	int retval=0;
-
-	checkhandle(hnd);
-
-	if(srcbuf==NULL || srcsize<=0 || dstbuf==NULL || dstsize==NULL
-		|| x<0 || y<0 || w<0 || h<0 || op<0 || op>=NUMXFORMOPT
-		|| flags<0)
-		_throw("Invalid argument in tjTransform()");
-	if(!j->initc || !j->initd)
-		_throw("Instance has not been initialized for transformation");
-
-	if(flags&TJ_FORCEMMX) putenv("JSIMD_FORCEMMX=1");
-	else if(flags&TJ_FORCESSE) putenv("JSIMD_FORCESSE=1");
-	else if(flags&TJ_FORCESSE2) putenv("JSIMD_FORCESSE2=1");
-
-	if(setjmp(j->jerr.jb))
-	{  // this will execute if LIBJPEG has an error
-		retval=-1;
-		goto bailout;
-	}
-
-	j->jsms.bytes_in_buffer=srcsize;
-	j->jsms.next_input_byte=srcbuf;
-
-	xinfo.transform=xformtypes[op];
-	xinfo.perfect=(options&TJXFORM_PERFECT)? 1:0;
-	xinfo.trim=(options&TJXFORM_TRIM)? 1:0;
-	xinfo.force_grayscale=(options&TJXFORM_GRAY)? 1:0;
-	xinfo.crop=(options&TJXFORM_CROP)? 1:0;
-
-	if(xinfo.crop)
-	{
-		xinfo.crop_xoffset=x;  xinfo.crop_xoffset_set=JCROP_POS;
-		xinfo.crop_yoffset=y;  xinfo.crop_yoffset_set=JCROP_POS;
-		if(w!=0)
-		{
-			xinfo.crop_width=w;  xinfo.crop_width_set=JCROP_POS;
-		}
-		if(h!=0)
-		{
-			xinfo.crop_height=h; xinfo.crop_height_set=JCROP_POS;
-		}
-	}
-
-	jcopy_markers_setup(&j->dinfo, JCOPYOPT_NONE);
-	jpeg_read_header(&j->dinfo, TRUE);
-
-	if(!jtransform_request_workspace(&j->dinfo, &xinfo))
-		_throw("Transform is not perfect");
-
-	if(!xinfo.crop)
-	{
-		w=j->dinfo.image_width;  h=j->dinfo.image_height;
-	}
-	else
-	{
-		w=xinfo.crop_width;  h=xinfo.crop_height;
-	}
-
-	j->jdms.next_output_byte=dstbuf;
-	j->jdms.free_in_buffer=TJBUFSIZE(w, h);
-
-	if(xinfo.crop)
-	{
-		if((x%xinfo.iMCU_sample_width)!=0 || (y%xinfo.iMCU_sample_height)!=0)
-		{
-			sprintf(lasterror, "To crop this JPEG image, x must be a multiple of %d and y must be a multiple\n"
-				"of %d.\n", xinfo.iMCU_sample_width, xinfo.iMCU_sample_height);
-			retval=-1;  goto bailout;
-		}
-	}
-
-	srccoefs=jpeg_read_coefficients(&j->dinfo);
-	jpeg_copy_critical_parameters(&j->dinfo, &j->cinfo);
-	dstcoefs=jtransform_adjust_parameters(&j->dinfo, &j->cinfo, srccoefs,
-		&xinfo);
-	jpeg_write_coefficients(&j->cinfo, dstcoefs);
-	jcopy_markers_execute(&j->dinfo, &j->cinfo, JCOPYOPT_ALL);
-	jtransform_execute_transformation(&j->dinfo, &j->cinfo, srccoefs, &xinfo);
-
-	jpeg_finish_compress(&j->cinfo);
-	jpeg_finish_decompress(&j->dinfo);
-
-	*dstsize=TJBUFSIZE(w, h)-(unsigned long)(j->jdms.free_in_buffer);
-
-	bailout:
-	if(j->cinfo.global_state>CSTATE_START) jpeg_abort_compress(&j->cinfo);
-	if(j->dinfo.global_state>DSTATE_START) jpeg_abort_decompress(&j->dinfo);
-	return retval;
 }
 
 
