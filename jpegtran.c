@@ -142,7 +142,6 @@ parse_switches (j_compress_ptr cinfo, int argc, char **argv,
   transformoption.trim = FALSE;
   transformoption.force_grayscale = FALSE;
   transformoption.crop = FALSE;
-  transformoption.slow_hflip = FALSE;
   cinfo->err->trace_level = 0;
 
   /* Scan command line options, adjust parameters */

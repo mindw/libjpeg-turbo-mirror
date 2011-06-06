@@ -51,9 +51,6 @@ PD_ONEHALF	times 2 dd  (1 << (SCALEBITS-1))
 	alignz	16
 
 ; --------------------------------------------------------------------------
-	SECTION	SEG_TEXT
-	BITS	32
-
 %include "jcclrmmx.asm"
 
 %undef RGB_RED
