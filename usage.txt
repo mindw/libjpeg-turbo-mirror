@@ -250,11 +250,10 @@ The basic command line switches for djpeg are:
 			djpeg runs noticeably faster in this mode.
 
 	-scale M/N	Scale the output image by a factor M/N.  Currently
-			the scale factor must be M/8, where M is an integer
-			between 1 and 16 inclusive, or any reduced fraction
-			thereof (such as 1/2, 3/4, etc.  Scaling is handy if
-			the image is larger than your screen; also, djpeg runs
-			much faster when scaling down the output.
+			the scale factor must be 1/1, 1/2, 1/4, or 1/8.
+			Scaling is handy if the image is larger than your
+			screen; also, djpeg runs much faster when scaling
+			down the output.
 
 	-bmp		Select BMP output format (Windows flavor).  8-bit
 			colormapped format is emitted if -colors or -grayscale

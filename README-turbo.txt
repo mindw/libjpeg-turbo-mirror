@@ -285,11 +285,6 @@ Fully supported:
    for convenience purposes.  It has always been possible to implement this
    feature with libjpeg v6b (see rdswitch.c for an example.)
 
--- libjpeg: IDCT scaling extensions in decompressor
-   libjpeg-turbo supports IDCT scaling with scaling factors of 1/8, 1/4, 3/8,
-   1/2, 5/8, 3/4, 7/8, 9/8, 5/4, 11/8, 3/2, 13/8, 7/4, 15/8, and 2/1 (only 1/4
-   and 1/2 are SIMD-accelerated.)
-
 -- cjpeg: 32-bit BMP support
 
 -- jpegtran: lossless cropping
@@ -320,6 +315,10 @@ Not supported:
    SmartScale is an extension to the JPEG format that allows for DCT block
    sizes other than 8x8.  It would be difficult to support this feature while
    retaining backward compatibility with libjpeg v6b.
+
+-- libjpeg: IDCT scaling extensions in decompressor
+   libjpeg-turbo still supports IDCT scaling with scaling factors of 1/2, 1/4,
+   and 1/8 (same as libjpeg v6b.)
 
 -- libjpeg: Fancy downsampling in compressor
    cinfo.do_fancy_downsampling is silently ignored.

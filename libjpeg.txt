@@ -1019,8 +1019,7 @@ The actual dimensions of the JPEG image that will be written to the file are
 given by the following fields.  These are computed from the input image
 dimensions and the compression parameters by jpeg_start_compress().  You can
 also call jpeg_calc_jpeg_dimensions() to obtain the values that will result
-from the current parameter settings.  This can be useful if you are trying
-to pick a scaling ratio that will get close to a desired target size.
+from the current parameter settings.
 
 JDIMENSION jpeg_width		Actual dimensions of output image.
 JDIMENSION jpeg_height
@@ -1114,8 +1113,7 @@ J_COLOR_SPACE out_color_space
 unsigned int scale_num, scale_denom
 	Scale the image by the fraction scale_num/scale_denom.  Default is
 	1/1, or no scaling.  Currently, the only supported scaling ratios
-	are M/8 with all M from 1 to 16, or any reduced fraction thereof (such
-	as 1/2, 3/4, etc.)  (The library design allows for arbitrary
+	are 1/1, 1/2, 1/4, and 1/8.  (The library design allows for arbitrary
 	scaling ratios but this is not likely to be implemented any time soon.)
 	Smaller scaling ratios permit significantly faster decoding since
 	fewer pixels need be processed and a simpler IDCT method can be used.
