@@ -455,8 +455,8 @@ shown are:
   buffered by the coefficient controller have NOT been dequantized; we
   merge dequantization and inverse DCT into a single step for speed reasons.
   When scaled-down output is asked for, simplified DCT algorithms may be used
-  that emit fewer samples per DCT block, not the full 8x8.  Works on one DCT
-  block at a time.
+  that emit only 1x1, 2x2, or 4x4 samples per DCT block, not the full 8x8.
+  Works on one DCT block at a time.
 
 * Postprocessing controller: buffer controller for the color quantization
   input buffer, when quantization is in use.  (Without quantization, this

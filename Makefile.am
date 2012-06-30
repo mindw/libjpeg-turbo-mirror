@@ -1,6 +1,6 @@
 lib_LTLIBRARIES = libjpeg.la libturbojpeg.la
 libjpeg_la_LDFLAGS = -version-info ${SO_MAJOR_VERSION}:${SO_MINOR_VERSION} -no-undefined
-libturbojpeg_la_LDFLAGS = -version-info 0:0 -no-undefined
+libturbojpeg_la_LDFLAGS = -avoid-version -no-undefined
 include_HEADERS = jerror.h jmorecfg.h jpeglib.h turbojpeg.h
 nodist_include_HEADERS = jconfig.h
 
@@ -173,13 +173,18 @@ if WITH_SSE_FLOAT_DCT
 else
 	cmp $(srcdir)/testimages/testorig.ppm testoutflt.ppm
 endif
-	for scale in 2_1 15_8 7_4 13_8 3_2 11_8 5_4 9_8 7_8 3_4 5_8 1_2 3_8 1_4 1_8; do \
-		scalearg=`echo $$scale | sed s@_@/@g`; \
-		./djpeg -dct int -nosmooth -scale $$scalearg -ppm -outfile testoutint$$scale.ppm $(srcdir)/testimages/testorig.jpg; \
-		cmp $(srcdir)/testimages/testimgint$$scale.ppm testoutint$$scale.ppm; \
-	done
+	./djpeg -dct int -scale 1/2 -ppm -outfile testoutint1_2.ppm $(srcdir)/testimages/testorig.jpg
+	cmp $(srcdir)/testimages/testimgint1_2.ppm testoutint1_2.ppm
 	./djpeg -dct fast -scale 1/2 -ppm -outfile testoutfst1_2.ppm $(srcdir)/testimages/testorig.jpg
 	cmp $(srcdir)/testimages/testimgfst1_2.ppm testoutfst1_2.ppm
+	./djpeg -dct int -scale 1/4 -ppm -outfile testoutint1_4.ppm $(srcdir)/testimages/testorig.jpg
+	cmp $(srcdir)/testimages/testimgint1_4.ppm testoutint1_4.ppm
+	./djpeg -dct fast -scale 1/4 -ppm -outfile testoutfst1_4.ppm $(srcdir)/testimages/testorig.jpg
+	cmp $(srcdir)/testimages/testimgfst1_4.ppm testoutfst1_4.ppm
+	./djpeg -dct int -scale 1/8 -ppm -outfile testoutint1_8.ppm $(srcdir)/testimages/testorig.jpg
+	cmp $(srcdir)/testimages/testimgint1_8.ppm testoutint1_8.ppm
+	./djpeg -dct fast -scale 1/8 -ppm -outfile testoutfst1_8.ppm $(srcdir)/testimages/testorig.jpg
+	cmp $(srcdir)/testimages/testimgfst1_8.ppm testoutfst1_8.ppm
 	./djpeg -dct int -bmp -colors 256 -outfile testout.bmp  $(srcdir)/testimages/testorig.jpg
 	cmp $(srcdir)/testimages/testimg.bmp testout.bmp
 if WITH_ARITH_ENC
@@ -311,6 +316,16 @@ endif
 
 dmg: all
 	sh pkgscripts/makemacpkg
+
+if X86_64
+
+csunpkg: all
+	sh pkgscripts/makesunpkg combined ${BUILDDIR32}
+
+endif
+
+sunpkg: all
+	sh pkgscripts/makesunpkg
 
 cygwinpkg: all
 	sh pkgscripts/makecygwinpkg
