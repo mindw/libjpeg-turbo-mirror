@@ -4,7 +4,7 @@ include_HEADERS = jerror.h jmorecfg.h jpeglib.h
 
 if WITH_TURBOJPEG
 lib_LTLIBRARIES += libturbojpeg.la
-libturbojpeg_la_LDFLAGS = -version-info 1:0:1 -no-undefined
+libturbojpeg_la_LDFLAGS = -version-info 0:0 -no-undefined
 include_HEADERS += turbojpeg.h
 endif
 
@@ -200,14 +200,11 @@ if WITH_JAVA
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -bi
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv
-	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv -noyuvpad
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv -bi
-	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv -bi -noyuvpad
 endif
 	./tjunittest
 	./tjunittest -alloc
 	./tjunittest -yuv
-	./tjunittest -yuv -noyuvpad
 endif
 	./cjpeg -dct int -outfile testoutint.jpg $(srcdir)/testimages/testorig.ppm
 	md5/md5cmp $(MD5_JPEG_INT) testoutint.jpg

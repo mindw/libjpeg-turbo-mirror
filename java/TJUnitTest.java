@@ -1,5 +1,5 @@
 /*
- * Copyright (C)2011-2013 D. R. Commander.  All Rights Reserved.
+ * Copyright (C)2011-2012 D. R. Commander.  All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -46,8 +46,6 @@ public class TJUnitTest {
     System.out.println("\nUSAGE: java " + classname + " [options]\n");
     System.out.println("Options:\n");
     System.out.println("-yuv = test YUV encoding/decoding support\n");
-    System.out.println("-noyuvpad = do not pad each line of each Y, U, and V plane to the nearest\n");
-    System.out.println("            4-byte boundary\n");
     System.out.println("-bi = test BufferedImage support\n");
     System.exit(1);
   }
@@ -95,7 +93,6 @@ public class TJUnitTest {
   private static final int YUVENCODE = 1;
   private static final int YUVDECODE = 2;
   private static int yuv = 0;
-  private static int pad = 4;
   private static boolean bi = false;
 
   private static int exitStatus = 0;
@@ -473,18 +470,16 @@ public class TJUnitTest {
   }
 
   private static int checkBufYUV(byte[] buf, int size, int w, int h,
-                                 int subsamp, TJScalingFactor sf)
-                                 throws Exception {
+                                 int subsamp) throws Exception {
     int row, col;
     int hsf = TJ.getMCUWidth(subsamp) / 8, vsf = TJ.getMCUHeight(subsamp) / 8;
     int pw = PAD(w, hsf), ph = PAD(h, vsf);
     int cw = pw / hsf, ch = ph / vsf;
-    int ypitch = PAD(pw, pad), uvpitch = PAD(cw, pad);
+    int ypitch = PAD(pw, 4), uvpitch = PAD(cw, 4);
     int retval = 1;
     int correctsize = ypitch * ph +
                       (subsamp == TJ.SAMP_GRAY ? 0 : uvpitch * ch * 2);
-    int halfway = 16 * sf.getNum() / sf.getDenom();
-    int blockSize = 8 * sf.getNum() / sf.getDenom();
+    int halfway = 16;
 
     try {
       if (size != correctsize)
@@ -494,7 +489,7 @@ public class TJUnitTest {
       for (row = 0; row < ph; row++) {
         for (col = 0; col < pw; col++) {
           byte y = buf[ypitch * row + col];
-          if (((row / blockSize) + (col / blockSize)) % 2 == 0) {
+          if (((row / 8) + (col / 8)) % 2 == 0) {
             if (row < halfway)
               checkVal255(row, col, y, "Y");
             else
@@ -508,12 +503,12 @@ public class TJUnitTest {
         }
       }
       if (subsamp != TJ.SAMP_GRAY) {
-        halfway = 16 / vsf * sf.getNum() / sf.getDenom();
+        halfway = 16 / vsf;
         for (row = 0; row < ch; row++) {
           for (col = 0; col < cw; col++) {
             byte u = buf[ypitch * ph + (uvpitch * row + col)],
                  v = buf[ypitch * ph + uvpitch * ch + (uvpitch * row + col)];
-            if (((row * vsf / blockSize) + (col * hsf / blockSize)) % 2 == 0) {
+            if (((row * vsf / 8) + (col * hsf / 8)) % 2 == 0) {
               checkVal(row, col, u, "U", 128);
               checkVal(row, col, v, "V", 128);
             } else {
@@ -620,7 +615,6 @@ public class TJUnitTest {
     t = getTime();
     tjc.setSubsamp(subsamp);
     tjc.setJPEGQuality(jpegQual);
-    tjc.setYUVPad(pad);
     if (bi) {
       if (yuv == YUVENCODE)
         tjc.encodeYUV(img, dstBuf, flags);
@@ -647,8 +641,7 @@ public class TJUnitTest {
     writeJPEG(dstBuf, size, tempstr);
 
     if (yuv == YUVENCODE) {
-      if (checkBufYUV(dstBuf, size, w, h, subsamp,
-                      new TJScalingFactor(1, 1)) == 1)
+      if (checkBufYUV(dstBuf, size, w, h, subsamp) == 1)
         System.out.print("Passed.");
       else {
         System.out.print("FAILED!");
@@ -684,7 +677,7 @@ public class TJUnitTest {
 
     System.out.print("JPEG -> ");
     if (yuv == YUVDECODE)
-      System.out.print("YUV " + subNameLong[subsamp] + " ");
+      System.out.print("YUV " + subNameLong[subsamp] + " ... ");
     else {
       System.out.print(pfStr + " ");
       if (bi)
@@ -693,11 +686,11 @@ public class TJUnitTest {
         System.out.print("Bottom-Up ");
       else
         System.out.print("Top-Down  ");
+      if (!sf.isOne())
+        System.out.print(sf.getNum() + "/" + sf.getDenom() + " ... ");
+      else
+        System.out.print("... ");
     }
-    if (!sf.isOne())
-      System.out.print(sf.getNum() + "/" + sf.getDenom() + " ... ");
-    else
-      System.out.print("... ");
 
     t = getTime();
     tjd.setJPEGImage(jpegBuf, jpegSize);
@@ -713,7 +706,7 @@ public class TJUnitTest {
       throw new Exception("Scaled size mismatch");
 
     if (yuv == YUVDECODE)
-      dstBuf = tjd.decompressToYUV(scaledWidth, pad, scaledHeight, flags);
+      dstBuf = tjd.decompressToYUV(flags);
     else {
       if (bi)
         img = tjd.decompress(scaledWidth, scaledHeight, imgType, flags);
@@ -732,8 +725,7 @@ public class TJUnitTest {
     }
 
     if (yuv == YUVDECODE) {
-      if (checkBufYUV(dstBuf, dstBuf.length, scaledWidth, scaledHeight,
-                      subsamp, sf) == 1)
+      if (checkBufYUV(dstBuf, dstBuf.length, w, h, subsamp) == 1)
         System.out.print("Passed.");
       else {
         System.out.print("FAILED!");  exitStatus = -1;
@@ -757,15 +749,14 @@ public class TJUnitTest {
                                  String baseName, int subsamp,
                                  int flags) throws Exception {
     int i;
-    TJScalingFactor[] sf = TJ.getScalingFactors();
-    for (i = 0; i < sf.length; i++) {
-      int num = sf[i].getNum();
-      int denom = sf[i].getDenom();
-      if (subsamp == TJ.SAMP_444 || subsamp == TJ.SAMP_GRAY ||
-          (num == 1 && (denom == 4 || denom == 2 || denom == 1)))
+    if ((subsamp == TJ.SAMP_444 || subsamp == TJ.SAMP_GRAY) && yuv == 0) {
+      TJScalingFactor[] sf = TJ.getScalingFactors();
+      for (i = 0; i < sf.length; i++)
         decompTest(tjd, jpegBuf, jpegSize, w, h, pf, baseName, subsamp,
                    flags, sf[i]);
-    }
+    } else
+      decompTest(tjd, jpegBuf, jpegSize, w, h, pf, baseName, subsamp,
+                 flags, new TJScalingFactor(1, 1));
   }
 
   private static void doTest(int w, int h, int[] formats, int subsamp,
@@ -776,7 +767,7 @@ public class TJUnitTest {
     byte[] dstBuf;
 
     if (yuv == YUVENCODE)
-      dstBuf = new byte[TJ.bufSizeYUV(w, pad, h, subsamp)];
+      dstBuf = new byte[TJ.bufSizeYUV(w, h, subsamp)];
     else
       dstBuf = new byte[TJ.bufSize(w, h, subsamp)];
 
@@ -867,8 +858,6 @@ public class TJUnitTest {
       for (int i = 0; i < argv.length; i++) {
         if (argv[i].equalsIgnoreCase("-yuv"))
           doyuv = true;
-        if (argv[i].equalsIgnoreCase("-noyuvpad"))
-          pad = 1;
         if (argv[i].substring(0, 1).equalsIgnoreCase("-h") ||
             argv[i].equalsIgnoreCase("-?"))
           usage();
