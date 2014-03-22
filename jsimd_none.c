@@ -258,18 +258,6 @@ jsimd_can_idct_4x4 (void)
   return 0;
 }
 
-GLOBAL(int)
-jsimd_can_idct_6x6 (void)
-{
-  return 0;
-}
-
-GLOBAL(int)
-jsimd_can_idct_12x12 (void)
-{
-  return 0;
-}
-
 GLOBAL(void)
 jsimd_idct_2x2 (j_decompress_ptr cinfo, jpeg_component_info * compptr,
                 JCOEFPTR coef_block, JSAMPARRAY output_buf,
@@ -281,20 +269,6 @@ GLOBAL(void)
 jsimd_idct_4x4 (j_decompress_ptr cinfo, jpeg_component_info * compptr,
                 JCOEFPTR coef_block, JSAMPARRAY output_buf,
                 JDIMENSION output_col)
-{
-}
-
-GLOBAL(void)
-jsimd_idct_6x6 (j_decompress_ptr cinfo, jpeg_component_info * compptr,
-                JCOEFPTR coef_block, JSAMPARRAY output_buf,
-                JDIMENSION output_col)
-{
-}
-
-GLOBAL(void)
-jsimd_idct_12x12 (j_decompress_ptr cinfo, jpeg_component_info * compptr,
-                  JCOEFPTR coef_block, JSAMPARRAY output_buf,
-                  JDIMENSION output_col)
 {
 }
 

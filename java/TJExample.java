@@ -277,7 +277,7 @@ public class TJExample implements TJCustomFilter {
             scaleFactor.isOne()) {
           file = new File(argv[1]);
           FileOutputStream fos = new FileOutputStream(file);
-          fos.write(tjd.getSourceBuf(), 0, tjd.getSourceSize());
+          fos.write(tjd.getJPEGBuf(), 0, tjd.getJPEGSize());
           fos.close();
           System.exit(0);
         }
@@ -324,11 +324,11 @@ public class TJExample implements TJCustomFilter {
         tjc.setSubsamp(outSubsamp);
         tjc.setJPEGQuality(outQual);
         if (img != null)
-          tjc.setSourceImage(img, 0, 0, 0, 0);
+          jpegBuf = tjc.compress(img, flags);
         else {
           tjc.setSourceImage(bmpBuf, 0, 0, width, 0, height, TJ.PF_BGRX);
+          jpegBuf = tjc.compress(flags);
         }
-        jpegBuf = tjc.compress(flags);
         jpegSize = tjc.getCompressedSize();
         tjc.close();
 

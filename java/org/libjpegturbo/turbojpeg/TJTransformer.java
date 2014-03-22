@@ -49,7 +49,7 @@ public class TJTransformer extends TJDecompressor {
    */
   public TJTransformer(byte[] jpegImage) throws Exception {
     init();
-    setSourceImage(jpegImage, jpegImage.length);
+    setJPEGImage(jpegImage, jpegImage.length);
   }
 
   /**
@@ -63,7 +63,7 @@ public class TJTransformer extends TJDecompressor {
    */
   public TJTransformer(byte[] jpegImage, int imageSize) throws Exception {
     init();
-    setSourceImage(jpegImage, imageSize);
+    setJPEGImage(jpegImage, imageSize);
   }
 
   /**
@@ -119,15 +119,15 @@ public class TJTransformer extends TJDecompressor {
   public TJDecompressor[] transform(TJTransform[] transforms, int flags)
     throws Exception {
     byte[][] dstBufs = new byte[transforms.length][];
-    if (srcWidth < 1 || srcHeight < 1)
+    if (jpegWidth < 1 || jpegHeight < 1)
       throw new Exception("JPEG buffer not initialized");
     for (int i = 0; i < transforms.length; i++) {
-      int w = srcWidth, h = srcHeight;
+      int w = jpegWidth, h = jpegHeight;
       if ((transforms[i].options & TJTransform.OPT_CROP) != 0) {
         if (transforms[i].width != 0) w = transforms[i].width;
         if (transforms[i].height != 0) h = transforms[i].height;
       }
-      dstBufs[i] = new byte[TJ.bufSize(w, h, srcSubsamp)];
+      dstBufs[i] = new byte[TJ.bufSize(w, h, jpegSubsamp)];
     }
     TJDecompressor[] tjd = new TJDecompressor[transforms.length];
     transform(dstBufs, transforms, flags);

@@ -4,7 +4,7 @@ include_HEADERS = jerror.h jmorecfg.h jpeglib.h
 
 if WITH_TURBOJPEG
 lib_LTLIBRARIES += libturbojpeg.la
-libturbojpeg_la_LDFLAGS = -version-info 1:0:1 -no-undefined
+libturbojpeg_la_LDFLAGS = -version-info 0:0 -no-undefined
 include_HEADERS += turbojpeg.h
 endif
 
@@ -154,7 +154,7 @@ dist_example_DATA = example.c
 
 EXTRA_DIST = win release $(DOCS) testimages CMakeLists.txt \
 	sharedlib/CMakeLists.txt cmakescripts libjpeg.map.in doc doxygen.config \
-	jccolext.c jdcolext.c jdmrgext.c jstdhuff.c
+	jccolext.c jdcolext.c jdmrgext.c
 
 dist-hook:
 	rm -rf `find $(distdir) -name .svn`
@@ -201,15 +201,11 @@ if WITH_JAVA
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -bi
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv
-	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv -noyuvpad
 	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv -bi
-	$(JAVA) -cp java/turbojpeg.jar -Djava.library.path=.libs TJUnitTest -yuv -bi -noyuvpad
 endif
 	./tjunittest
 	./tjunittest -alloc
 	./tjunittest -yuv
-	./tjunittest -yuv -alloc
-	./tjunittest -yuv -noyuvpad
 endif
 	./cjpeg -dct int -outfile testoutint.jpg $(srcdir)/testimages/testorig.ppm
 	md5/md5cmp $(MD5_JPEG_INT) testoutint.jpg
@@ -318,19 +314,12 @@ testclean:
 	rm -f *_440_*.ppm
 	rm -f *_440_*.jpg
 	rm -f *_440.yuv
-	rm -f *_411_*.bmp
-	rm -f *_411_*.png
-	rm -f *_411_*.ppm
-	rm -f *_411_*.jpg
-	rm -f *_411.yuv
 
 
 tjtest:
 	sh ./tjbenchtest
-	sh ./tjbenchtest -yuv
 if WITH_JAVA
 	sh ./tjbenchtest.java
-	sh ./tjbenchtest.java -yuv
 endif
 
 

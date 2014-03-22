@@ -13,7 +13,6 @@ JAVASOURCES = org/libjpegturbo/turbojpeg/TJ.java \
 	org/libjpegturbo/turbojpeg/TJScalingFactor.java \
 	org/libjpegturbo/turbojpeg/TJTransform.java \
 	org/libjpegturbo/turbojpeg/TJTransformer.java \
-	org/libjpegturbo/turbojpeg/YUVImage.java \
 	TJExample.java \
 	TJUnitTest.java \
 	TJBench.java
@@ -35,7 +34,6 @@ JAVA_CLASSES = org/libjpegturbo/turbojpeg/TJ.class \
 	org/libjpegturbo/turbojpeg/TJScalingFactor.class \
 	org/libjpegturbo/turbojpeg/TJTransform.class \
 	org/libjpegturbo/turbojpeg/TJTransformer.class \
-	org/libjpegturbo/turbojpeg/YUVImage.class \
 	TJExample.class \
 	TJUnitTest.class \
 	TJBench.class
