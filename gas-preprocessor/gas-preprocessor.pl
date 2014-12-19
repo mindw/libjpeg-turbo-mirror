@@ -15,6 +15,8 @@ use File::Temp qw(tempfile);
 my @gcc_cmd = @ARGV;
 my @preprocess_c_cmd;
 
+my $arch = "arm";
+
 my $fix_unreq = $^O eq "darwin";
 
 if ($gcc_cmd[0] eq "-fix-unreq") {
@@ -54,6 +56,7 @@ my $comm;
 # detect architecture from gcc binary name
 if ($gcc_cmd[0] =~ /arm64|aarch64/) {
     $comm = ';';
+    $arch = "aarch64";
 } elsif ($gcc_cmd[0] =~ /arm/) {
     $comm = '@';
 } elsif ($gcc_cmd[0] =~ /powerpc|ppc/) {
@@ -65,6 +68,7 @@ foreach my $i (1 .. $#gcc_cmd-1) {
     if ($gcc_cmd[$i] eq "-arch") {
         if ($gcc_cmd[$i+1] =~ /arm64|aarch64/) {
             $comm = ';';
+            $arch = "aarch64";
         } elsif ($gcc_cmd[$i+1] =~ /arm/) {
             $comm = '@';
         } elsif ($gcc_cmd[$i+1] =~ /powerpc|ppc/) {
@@ -78,6 +82,7 @@ if (!$comm) {
     my $native_arch = qx/arch/;
     if ($native_arch =~ /arm64|aarch64/) {
         $comm = ';';
+        $arch = "aarch64";
     } elsif ($native_arch =~ /arm/) {
         $comm = '@';
     } elsif ($native_arch =~ /powerpc|ppc/) {
@@ -106,6 +111,8 @@ my @pass1_lines;
 my @ifstack;
 
 my %symbols;
+
+my %aarch64_req_alias;
 
 # pass 1: parse .macro
 # note that the handling of arguments is probably overly permissive vs. gas
@@ -170,7 +177,7 @@ sub handle_if {
         } elsif ($type eq "lt") {
             $result = eval_expr($expr) < 0;
         } else {
-	    chomp($line);
+            chomp($line);
             die "unhandled .if varient. \"$line\"";
         }
         push (@ifstack, $result);
@@ -467,12 +474,46 @@ foreach my $line (@pass1_lines) {
         }
     }
 
+    if ($line =~ /\.unreq\s+(.*)/) {
+        if (defined $aarch64_req_alias{$1}) {
+            delete $aarch64_req_alias{$1};
+            next;
+        }
+    }
     # old gas versions store upper and lower case names on .req,
     # but they remove only one on .unreq
     if ($fix_unreq) {
         if ($line =~ /\.unreq\s+(.*)/) {
             $line = ".unreq " . lc($1) . "\n";
             print ASMFILE ".unreq " . uc($1) . "\n";
+        }
+    }
+
+    if ($arch eq "aarch64") {
+        # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
+        if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
+            $aarch64_req_alias{$1} = $2;
+            next;
+        }
+        foreach (keys %aarch64_req_alias) {
+            my $alias = $_;
+            # recursively resolve aliases
+            my $resolved = $aarch64_req_alias{$alias};
+            while (defined $aarch64_req_alias{$resolved}) {
+                $resolved = $aarch64_req_alias{$resolved};
+            }
+            $line =~ s/\b$alias\b/$resolved/g;
+        }
+    }
+    if ($arch eq "aarch64") {
+        # fix missing aarch64 instructions in Xcode 5.1 (beta3)
+        # mov with vector arguments is not supported, use alias orr instead
+        if ($line =~ /^\s*mov\s+(v\d[\.{}\[\]\w]+),\s*(v\d[\.{}\[\]\w]+)\b\s*$/) {
+            $line = "        orr $1, $2, $2\n";
+        }
+        # movi 16, 32 bit shifted variant, shift is optional
+        if ($line =~ /^\s*movi\s+(v[0-3]?\d\.(?:2|4|8)[hsHS])\s*,\s*(#\w+)\b\s*$/) {
+            $line = "        movi $1, $2, lsl #0\n";
         }
     }
 
