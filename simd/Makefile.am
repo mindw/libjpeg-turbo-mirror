@@ -70,20 +70,6 @@ libsimd_la_SOURCES = jsimd_mips.c jsimd_mips_dspr2_asm.h jsimd_mips_dspr2.S
 
 endif
 
-if SIMD_POWERPC
-
-libsimd_la_SOURCES = jsimd_powerpc.c \
-	jccolor-altivec.c     jcgray-altivec.c \
-	jfdctfst-altivec.c    jfdctint-altivec.c \
-	jidctfst-altivec.c    jidctint-altivec.c \
-  jquanti-altivec.c
-libsimd_la_CFLAGS = -maltivec
-
-jccolor-altivec.lo:  jccolext-altivec.c
-jcgray-altivec.lo:   jcgryext-altivec.c
-
-endif
-
 AM_CPPFLAGS = -I$(top_srcdir)
 
 .asm.lo:

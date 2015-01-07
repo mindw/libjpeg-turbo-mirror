@@ -262,10 +262,7 @@ MD5_JPEG_CROP = b4197f377e621c4e9b1d20471432610d
 
 endif
 
-.PHONY: test
-test: tjquicktest bittest
-
-tjquicktest: testclean all
+test: testclean all
 
 if WITH_TURBOJPEG
 if WITH_JAVA
@@ -282,8 +279,6 @@ endif
 	./tjunittest -yuv -alloc
 	./tjunittest -yuv -noyuvpad
 endif
-
-bittest: testclean all
 
 # These tests are carefully crafted to provide full coverage of as many of the
 # underlying algorithms as possible (including all of the SIMD-accelerated
